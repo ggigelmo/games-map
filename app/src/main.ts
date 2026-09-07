@@ -3,16 +3,22 @@ import './style.css';
 import type { StyleSpecification } from 'maplibre-gl';
 
 import styleJson from '../../style/cyberpunk.json';
-import { MapView, type Fix } from './map/map';
+import { MapView } from './map/map';
 import { Hud } from './hud/hud';
 import { mountDiagnostics } from './diag/probe';
+import { GeoWatcher } from './services/geolocation';
+import { route as calcularRuta } from './services/routing';
+import { StadiaError } from './services/stadia';
+import { RouteLayer } from './route/route-layer';
+import { RouteCard } from './route/route-card';
+import { SearchOverlay } from './search/search-overlay';
 
 /**
  * MapLibre EXIGE que la URL del sprite sea absoluta, al contrario que las de
  * teselas y glifos, que acepta relativas ("Invalid sprite URL, must be
  * absolute"). El estilo guarda una ruta relativa a la raiz para seguir siendo
- * portable entre localhost y Netlify, asi que se resuelve aqui contra el origen
- * actual antes de entregarselo al mapa.
+ * portable entre localhost y Cloudflare, asi que se resuelve aqui contra el
+ * origen actual antes de entregarselo al mapa.
  */
 function resolveSprite(s: StyleSpecification): StyleSpecification {
   if (typeof s.sprite !== 'string' || /^[a-z]+:/i.test(s.sprite)) return s;
@@ -26,35 +32,72 @@ const ui = document.getElementById('ui')!;
 
 const view = new MapView(mapEl, style);
 const hud = new Hud();
+const routeLayer = new RouteLayer(view.map);
+const routeCard = new RouteCard();
 
 // MapLibre emite los fallos de estilo y de teselas por este evento en vez de
 // lanzarlos, asi que sin esto un estilo invalido se ve como un mapa negro.
 view.map.on('error', (e) => console.error('[map]', e.error?.message ?? e));
+
+// ------------------------------------------------------------- posicion
+
+const geo = new GeoWatcher();
+const diag = mountDiagnostics(geo);
+
+geo.onFix((fix) => {
+  view.update(fix);
+  hud.update(fix);
+});
+
+geo.start();
+
 if (import.meta.env.DEV) {
   Object.assign(window as unknown as Record<string, unknown>, {
     __map: view.map,
     __view: view,
+    __geo: geo,
     __style: style,
   });
 }
 
-// mountDiagnostics es tambien quien posee el watchPosition: se monta siempre,
-// aunque el panel este oculto, porque el HUD se alimenta de su onFix.
-// TODO fase 2: extraer el watcher a services/geolocation.ts cuando el routing
-// tambien necesite la posicion.
-const diag = mountDiagnostics();
+// -------------------------------------------------------- busqueda y ruta
 
-diag.onFix((pos) => {
-  const fix: Fix = {
-    lng: pos.coords.longitude,
-    lat: pos.coords.latitude,
-    heading: pos.coords.heading,
-    speed: pos.coords.speed,
-    accuracy: pos.coords.accuracy,
-  };
-  view.update(fix);
-  hud.update(fix);
-});
+const search = new SearchOverlay(() => geo.last);
+// Fuera de #ui a proposito: ahi dentro la regla de pointer-events lo mataria.
+document.body.appendChild(search.el);
+
+let enCurso: AbortController | null = null;
+
+search.onPick = async (place) => {
+  const desde = geo.last;
+  if (!desde) return;
+
+  enCurso?.abort();
+  const ctrl = new AbortController();
+  enCurso = ctrl;
+
+  routeCard.showPending(place.label);
+
+  try {
+    const ruta = await calcularRuta(desde, place, ctrl.signal);
+    if (ctrl.signal.aborted) return;
+    routeLayer.show(ruta);
+    routeCard.show(place.label, ruta);
+    view.fitRoute(ruta.bounds);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return;
+    routeCard.showError(
+      place.label,
+      err instanceof StadiaError ? err.message : 'No se pudo calcular la ruta',
+    );
+  }
+};
+
+routeCard.onClear = () => {
+  enCurso?.abort();
+  routeLayer.clear();
+  routeCard.hide();
+};
 
 // ------------------------------------------------------------------- UI
 
@@ -69,6 +112,14 @@ const button = (text: string, ghost: boolean, onClick: () => void) => {
   controls.appendChild(b);
   return b;
 };
+
+// Sin posicion no hay origen para la ruta, asi que el boton nace apagado en vez
+// de fallar al pulsarlo.
+const searchBtn = button('Buscar', false, () => search.open());
+searchBtn.disabled = true;
+geo.onFix(() => {
+  searchBtn.disabled = false;
+});
 
 const recenterBtn = button('Recentrar', true, () => view.recenter());
 
@@ -93,7 +144,7 @@ const diagBtn = button('Diag', true, () => {
 const spacer = document.createElement('div');
 spacer.className = 'spacer';
 
-ui.append(hud.el, spacer, diag.el, controls);
+ui.append(hud.el, spacer, diag.el, routeCard.el, controls);
 
 // ------------------------------------------------------------ wake lock
 //
@@ -178,7 +229,8 @@ if (new URLSearchParams(location.search).has('lab')) {
 // -------------------------------------------------------------- HMR
 //
 // Editar style/build.mjs -> el plugin de Vite regenera cyberpunk.json -> esto
-// reaplica el estilo sin recargar la pagina ni perder la camara.
+// reaplica el estilo sin recargar la pagina ni perder la camara. RouteLayer se
+// repinta sola al oir 'style.load'.
 
 if (import.meta.hot) {
   import.meta.hot.accept('../../style/cyberpunk.json', (mod) => {

@@ -14,6 +14,8 @@
  *     la pantalla se apaga a mitad de trayecto.
  */
 
+import type { GeoWatcher } from '../services/geolocation';
+
 type Verdict = 'ok' | 'warn' | 'bad' | 'pending';
 
 interface Row {
@@ -22,21 +24,17 @@ interface Row {
   verdict: Verdict;
 }
 
-const NO_RESPONSE_MS = 12_000;
-
 export interface Diagnostics {
   el: HTMLElement;
-  /** Ultimo estado del GPS, para que el HUD lo reutilice. */
-  onFix: (cb: (p: GeolocationPosition) => void) => void;
 }
 
-export function mountDiagnostics(): Diagnostics {
+/** @param geo dueno del watchPosition; este panel solo mide lo que sale de el */
+export function mountDiagnostics(geo: GeoWatcher): Diagnostics {
   const el = document.createElement('section');
   el.className = 'panel';
   el.id = 'diag';
 
   const rows = new Map<string, Row>();
-  const fixCbs: ((p: GeolocationPosition) => void)[] = [];
 
   // Se declara aqui arriba porque render() lo reengancha en cada pintada, y
   // render() ya corre desde el primer set(), antes de la seccion de voz.
@@ -95,82 +93,58 @@ export function mountDiagnostics(): Diagnostics {
   );
 
   // ---------------------------------------------------- geolocalizacion
+  //
+  // El watcher ya no vive aqui: lo posee services/geolocation.ts, porque el
+  // routing tambien necesita la posicion y no puede depender de un panel de
+  // depuracion. Esto solo mide lo que sale de el.
 
   set('geo', 'GPS: primer fix', 'esperando...', 'pending');
   set('acc', 'Precision', '-', 'pending');
   set('rate', 'Intervalo entre fixes', '-', 'pending');
 
-  const t0 = performance.now();
   let fixes = 0;
   let lastFixAt = 0;
   const intervals: number[] = [];
-  let answered = false;
 
-  // El timeout de la API no salta con el bug de standalone. Este si.
-  const noResponse = window.setTimeout(() => {
-    if (!answered) {
-      set(
-        'geo',
-        'GPS: primer fix',
-        'SIN RESPUESTA',
-        'bad',
-      );
-      set('acc', 'Precision', 'permiso nunca resuelto', 'bad');
+  geo.onFix((fix) => {
+    fixes += 1;
+    if (lastFixAt) intervals.push(fix.at - lastFixAt);
+    lastFixAt = fix.at;
+
+    if (fixes === 1) {
+      set('geo', 'GPS: primer fix', `${Math.round(fix.at - geo.startedAt)} ms`, 'ok');
     }
-  }, NO_RESPONSE_MS);
 
-  if (!('geolocation' in navigator)) {
-    answered = true;
-    clearTimeout(noResponse);
-    set('geo', 'GPS: primer fix', 'NO SOPORTADO', 'bad');
-  } else {
-    navigator.geolocation.watchPosition(
-      (pos) => {
-        answered = true;
-        clearTimeout(noResponse);
-        fixes += 1;
-        const now = performance.now();
-        if (lastFixAt) intervals.push(now - lastFixAt);
-        lastFixAt = now;
-
-        if (fixes === 1) {
-          set('geo', 'GPS: primer fix', `${Math.round(now - t0)} ms`, 'ok');
-        }
-
-        const acc = pos.coords.accuracy;
-        // >500 m es la firma de "Ubicacion precisa" desactivada.
-        set(
-          'acc',
-          'Precision',
-          `${acc < 1000 ? acc.toFixed(0) + ' m' : (acc / 1000).toFixed(1) + ' km'}  (${fixes} fix)`,
-          acc <= 30 ? 'ok' : acc <= 200 ? 'warn' : 'bad',
-        );
-
-        if (intervals.length) {
-          const med = [...intervals].sort((a, b) => a - b)[intervals.length >> 1]!;
-          set(
-            'rate',
-            'Intervalo entre fixes',
-            med < 1000 ? `${med.toFixed(0)} ms` : `${(med / 1000).toFixed(1)} s`,
-            med <= 5000 ? 'ok' : med <= 30_000 ? 'warn' : 'bad',
-          );
-        }
-
-        for (const cb of fixCbs) cb(pos);
-      },
-      (err) => {
-        answered = true;
-        clearTimeout(noResponse);
-        const names: Record<number, string> = {
-          1: 'PERMISO DENEGADO',
-          2: 'POSICION NO DISPONIBLE',
-          3: 'TIMEOUT',
-        };
-        set('geo', 'GPS: primer fix', names[err.code] ?? `ERROR ${err.code}`, 'bad');
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 20_000 },
+    const acc = fix.accuracy;
+    // >500 m es la firma de "Ubicacion precisa" desactivada para Safari.
+    set(
+      'acc',
+      'Precision',
+      `${acc < 1000 ? acc.toFixed(0) + ' m' : (acc / 1000).toFixed(1) + ' km'}  (${fixes} fix)`,
+      acc <= 30 ? 'ok' : acc <= 200 ? 'warn' : 'bad',
     );
-  }
+
+    if (intervals.length) {
+      const med = [...intervals].sort((a, b) => a - b)[intervals.length >> 1]!;
+      set(
+        'rate',
+        'Intervalo entre fixes',
+        med < 1000 ? `${med.toFixed(0)} ms` : `${(med / 1000).toFixed(1)} s`,
+        med <= 5000 ? 'ok' : med <= 30_000 ? 'warn' : 'bad',
+      );
+    }
+  });
+
+  geo.onFailure((f) => {
+    const texto =
+      f.kind === 'unsupported'
+        ? 'NO SOPORTADO'
+        : f.kind === 'silent'
+          ? 'SIN RESPUESTA'
+          : f.message;
+    set('geo', 'GPS: primer fix', texto, 'bad');
+    if (f.kind === 'silent') set('acc', 'Precision', 'permiso nunca resuelto', 'bad');
+  });
 
   // -------------------------------------------------------- wake lock
 
@@ -238,8 +212,5 @@ export function mountDiagnostics(): Diagnostics {
 
   render();
 
-  return {
-    el,
-    onFix: (cb) => fixCbs.push(cb),
-  };
+  return { el };
 }

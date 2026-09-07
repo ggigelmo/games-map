@@ -143,3 +143,25 @@ console.log(k.filter(x=>x.includes('@rollup/rollup-')).length)"
 ```
 
 Si sale 2, el lockfile esta mal. Si sale ~25, esta bien.
+
+## 9. `display: flex` anula el atributo `hidden`
+
+**Sintoma:** el buscador aparecia abierto nada mas cargar la app, y la tarjeta
+de ruta se veia sin haber trazado ninguna, pese a que el codigo hacia
+`el.hidden = true` y leer `el.hidden` devolvia `true`.
+
+**Causa:** `hidden` no es magia del DOM. El navegador lo implementa con una
+regla `[hidden] { display: none }` en **su** hoja de estilos, que tiene menos
+prioridad que cualquier regla de la nuestra. En cuanto `.search` y `.route-card`
+declararon `display: flex`, `hidden` dejo de tener efecto visual.
+
+Lo traicionero es que la propiedad sigue diciendo `true`, asi que comprobarlo
+desde la consola no lo detecta. Solo se ve mirando la pantalla, o preguntando
+por `getComputedStyle(el).display`.
+
+**Solucion**, una linea en `app/src/style.css`, que cierra la categoria entera
+en vez de parchear los dos casos:
+
+```css
+[hidden] { display: none !important; }
+```

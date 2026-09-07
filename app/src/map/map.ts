@@ -1,5 +1,7 @@
 import maplibregl, { Map, Marker, type LngLat, type StyleSpecification } from 'maplibre-gl';
 
+import type { Fix } from '../services/geolocation';
+
 /**
  * Cuantos pixeles tiene que panear el mapa para considerarlo un arrastre
  * deliberado y soltar la camara. Un pulgar apoyado se mueve unos pocos; un
@@ -29,15 +31,9 @@ function playerMarkerEl(): HTMLElement {
   return el;
 }
 
-export interface Fix {
-  lng: number;
-  lat: number;
-  /** grados, o null si el GPS no lo sabe (parado) */
-  heading: number | null;
-  /** m/s, o null */
-  speed: number | null;
-  accuracy: number;
-}
+// `Fix` lo define quien lo produce: services/geolocation.ts. Se reexporta para
+// no obligar a los consumidores del mapa a saber de donde sale.
+export type { Fix } from '../services/geolocation';
 
 export class MapView {
   readonly map: Map;
@@ -171,6 +167,24 @@ export class MapView {
         essential: true,
       });
     }
+  }
+
+  /**
+   * Encuadra la ruta completa. Suelta la camara a proposito: quieres ver por
+   * donde va antes de arrancar, y RECENTRAR la devuelve a seguirte.
+   *
+   * El relleno inferior es mayor que el superior porque abajo estan la tarjeta
+   * de ruta y los botones; sin eso la ruta queda escondida detras del HUD.
+   */
+  fitRoute(bounds: [[number, number], [number, number]]) {
+    this.following = false;
+    this.map.fitBounds(bounds, {
+      padding: { top: 110, bottom: 240, left: 50, right: 50 },
+      pitch: 0,
+      bearing: 0,
+      duration: 900,
+      essential: true,
+    });
   }
 
   togglePitch() {

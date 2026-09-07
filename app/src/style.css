@@ -17,6 +17,12 @@
 
 * { box-sizing: border-box; }
 
+/* El atributo `hidden` lo aplica el navegador con `display: none` desde SU hoja
+   de estilos, que pierde contra cualquier regla nuestra. Sin esto, todo lo que
+   declare `display: flex` (el buscador, la tarjeta de ruta) ignora `hidden` y
+   se ve siempre. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -154,3 +160,98 @@ html, body {
 }
 .maplibregl-ctrl-attrib a { color: var(--cyan-dim) !important; }
 .maplibregl-ctrl-logo { display: none !important; }
+
+/* ------------------------------------------------------- tarjeta de ruta */
+.route-card { display: flex; align-items: center; gap: 12px; }
+.route-card__text { flex: 1; min-width: 0; }
+
+.route-card__dest {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  /* Los nombres de Pelias son largos: "Calle X, Barrio, Ciudad, Pais". */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.route-card__figs {
+  font-size: 14px;
+  color: var(--magenta);
+  text-shadow: 0 0 10px rgba(255, 0, 60, 0.5);
+}
+
+.route-card__x {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  background: transparent;
+  border: 1px solid rgba(255, 0, 60, 0.5);
+  color: var(--magenta);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+
+/* ------------------------------------------------------------ buscador */
+/* Vive FUERA de #ui: ahi dentro la regla de pointer-events lo dejaria muerto. */
+.search {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(3, 5, 12, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: calc(var(--top) + 12px) calc(var(--right) + 12px)
+           calc(var(--bottom) + 12px) calc(var(--left) + 12px);
+}
+
+.search__bar { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; }
+
+.search__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--cyan);
+  font-family: Rajdhani, "Segoe UI", system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  /* 17px A PROPOSITO: por debajo de 16, iOS hace zoom a toda la pagina en
+     cuanto enfocas el campo, y la app se queda descuadrada. */
+  font-size: 17px;
+}
+.search__input::placeholder { color: var(--cyan-dim); }
+.search__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.search__status { min-height: 14px; padding-left: 4px; }
+
+.search__list {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.search__item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  /* Alto de dedo, no de raton. */
+  padding: 13px 12px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.12);
+  cursor: pointer;
+}
+.search__item:active { background: rgba(0, 240, 255, 0.08); }
+
+.search__label { flex: 1; font-size: 15px; color: var(--ink); }
+.search__dist { flex: none; font-size: 12px; color: var(--cyan-dim); white-space: nowrap; }
+
+.btn:disabled { opacity: 0.35; cursor: default; }
