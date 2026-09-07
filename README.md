@@ -89,37 +89,44 @@ key). Al pasar a fase 2 hara falta geocodificacion y rutas: Stadia Maps sirve la
 tres cosas con una clave gratuita y el mismo esquema de teselas, asi que cambiar
 de proveedor es cambiar dos URLs en `build.mjs`.
 
-## Desplegar (Cloudflare Pages)
+## Desplegar (Cloudflare Workers)
 
-En el panel de Cloudflare: **Workers & Pages -> Create -> Pages -> Connect to
-Git**, eliges `ggigelmo/games-map` y rellenas:
+Ya esta configurado. En **Workers & Pages -> Create -> Import a repository**,
+con `ggigelmo/games-map`, la configuracion es:
 
 | Campo | Valor |
 |---|---|
-| Framework preset | `Vite` (o `None`) |
 | Build command | `npm run build` |
-| Build output directory | `dist` |
-| Root directory | `app` |
+| Deploy command | `npx wrangler deploy` |
+| Root directory | `/` |
 
-Nada mas. La version de Node la fija `app/.nvmrc`, y `app/public/_redirects` y
-`app/public/_headers` los copia Vite a `dist/`, que es donde Cloudflare los
-busca.
+El build corre desde la raiz del repo, no desde `app/`. Eso funciona porque el
+`package.json` de la raiz declara `app` como **workspace** de npm: `npm install`
+instala las dependencias del workspace y `npm run build` delega en el. Tambien
+evita que el build dependa de subir un nivel para encontrar `style/`.
 
-> **Si el build falla por no encontrar `../style/build.mjs`**: significa que
-> Cloudflare no clono el repo completo. Entonces deja *Root directory* vacio y
-> usa `npm ci --prefix app && npm --prefix app run build` como build command,
-> con `app/dist` como output directory.
-
-Comprobar en local antes de subir:
+`wrangler.jsonc` define un Worker **sin codigo**, solo assets, asi que no lleva
+`main`. Validar la configuracion sin desplegar ni necesitar credenciales:
 
 ```bash
-npm --prefix app run build && npm --prefix app run preview
+npm run build && npx wrangler deploy --dry-run
 ```
 
-Cloudflare tiene Pages en modo mantenimiento y recomienda **Workers con static
-assets** para proyectos nuevos. Para un sitio estatico Pages sigue funcionando y
-recibiendo arreglos, pero el proxy que hara falta en la fase 2 para esconder la
-clave de Stadia vive mejor en un Worker. Ese es el momento de migrar.
+Para desplegar desde tu maquina en vez de por Git (requiere `npx wrangler login`
+una vez):
+
+```bash
+npm run deploy
+```
+
+El fallback de una sola pagina lo da `not_found_handling` en `wrangler.jsonc`.
+`app/public/_headers` sigue existiendo porque hace algo que `wrangler.jsonc` no:
+fijar el `Content-Type` del manifest. Workers soporta `_headers` y `_redirects`
+de forma nativa.
+
+Cuando la fase 2 necesite esconder la clave de Stadia, el proxy entra como
+`main` en `wrangler.jsonc` y convive con los assets en el mismo Worker. Es la
+razon de estar en Workers y no en Pages.
 
 ## Instalar en el iPhone
 

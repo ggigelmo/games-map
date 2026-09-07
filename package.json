@@ -1,0 +1,19 @@
+{
+  "name": "games-map",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Navegador GPS con estetica Cyberpunk 2077",
+  "workspaces": ["app"],
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "build": "npm run build --workspace app",
+    "preview": "npm run preview --workspace app",
+    "style": "node style/build.mjs",
+    "sprite": "node assets/make-sprite.mjs && node style/build.mjs",
+    "icons": "node assets/make-icons.mjs",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.1"
+  }
+}
