@@ -1,0 +1,8 @@
+# Sin esto algunos servidores devuelven el manifest como octet-stream y el
+# navegador lo ignora, con lo que se pierden el nombre y el icono de la PWA.
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+
+# El JS y el CSS llevan hash en el nombre, asi que son inmutables.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -89,14 +89,42 @@ key). Al pasar a fase 2 hara falta geocodificacion y rutas: Stadia Maps sirve la
 tres cosas con una clave gratuita y el mismo esquema de teselas, asi que cambiar
 de proveedor es cambiar dos URLs en `build.mjs`.
 
-## Desplegar
+## Desplegar (Cloudflare Pages)
+
+En el panel de Cloudflare: **Workers & Pages -> Create -> Pages -> Connect to
+Git**, eliges `ggigelmo/games-map` y rellenas:
+
+| Campo | Valor |
+|---|---|
+| Framework preset | `Vite` (o `None`) |
+| Build command | `npm run build` |
+| Build output directory | `dist` |
+| Root directory | `app` |
+
+Nada mas. La version de Node la fija `app/.nvmrc`, y `app/public/_redirects` y
+`app/public/_headers` los copia Vite a `dist/`, que es donde Cloudflare los
+busca.
+
+> **Si el build falla por no encontrar `../style/build.mjs`**: significa que
+> Cloudflare no clono el repo completo. Entonces deja *Root directory* vacio y
+> usa `npm ci --prefix app && npm --prefix app run build` como build command,
+> con `app/dist` como output directory.
+
+Comprobar en local antes de subir:
 
 ```bash
-npm --prefix app run build
+npm --prefix app run build && npm --prefix app run preview
 ```
 
-Con `netlify.toml` ya configurado, conectar el repo a Netlify basta. Despues, en
-el iPhone: abrir la URL **en Safari**, Compartir -> Anadir a pantalla de inicio.
+Cloudflare tiene Pages en modo mantenimiento y recomienda **Workers con static
+assets** para proyectos nuevos. Para un sitio estatico Pages sigue funcionando y
+recibiendo arreglos, pero el proxy que hara falta en la fase 2 para esconder la
+clave de Stadia vive mejor en un Worker. Ese es el momento de migrar.
+
+## Instalar en el iPhone
+
+Abrir la URL **en Safari** (no en Chrome), Compartir -> Anadir a pantalla de
+inicio. Arranca a pantalla completa, sin barra del navegador.
 
 > Antes de nada, en el iPhone: Ajustes -> Privacidad y seguridad -> Localizacion
 > -> Safari -> **Ubicacion precisa activada**. Sin eso el GPS devuelve una
