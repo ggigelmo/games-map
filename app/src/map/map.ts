@@ -1,4 +1,11 @@
-import maplibregl, { Map, Marker, type StyleSpecification } from 'maplibre-gl';
+import maplibregl, { Map, Marker, type LngLat, type StyleSpecification } from 'maplibre-gl';
+
+/**
+ * Cuantos pixeles tiene que panear el mapa para considerarlo un arrastre
+ * deliberado y soltar la camara. Un pulgar apoyado se mueve unos pocos; un
+ * gesto de verdad se pasa de esto de sobra.
+ */
+const PAN_INTENT_PX = 32;
 
 /** Chevron del jugador: cian con halo, apuntando al rumbo. */
 function playerMarkerEl(): HTMLElement {
@@ -36,9 +43,27 @@ export class MapView {
   readonly map: Map;
   private marker: Marker | null = null;
   private markerInner = playerMarkerEl();
-  /** Si true, la camara persigue al jugador. Se apaga al arrastrar el mapa. */
-  following = true;
   private lastHeading = 0;
+  private _following = true;
+
+  /**
+   * Avisa de los cambios de `following` para que la UI pueda reflejarlos.
+   *
+   * Sin esto el seguimiento se apagaba en silencio y la app parecia rota: el
+   * mapa dejaba de seguirte sin que nada en pantalla dijera por que.
+   */
+  onFollowingChange: ((following: boolean) => void) | null = null;
+
+  /** Si true, la camara persigue al jugador. */
+  get following(): boolean {
+    return this._following;
+  }
+
+  set following(value: boolean) {
+    if (this._following === value) return;
+    this._following = value;
+    this.onFollowingChange?.(value);
+  }
 
   constructor(container: HTMLElement, style: StyleSpecification) {
     this.map = new maplibregl.Map({
@@ -62,8 +87,41 @@ export class MapView {
     // emergencia y el mapa no vuelve a pintar nunca. Hay que reavisarle.
     new ResizeObserver(() => this.map.resize()).observe(container);
 
-    // Cualquier gesto de arrastre suelta la camara. Es lo que espera el usuario.
-    this.map.on('dragstart', () => (this.following = false));
+    this.watchForIntentionalPan();
+  }
+
+  /**
+   * Suelta la camara solo ante un arrastre DELIBERADO.
+   *
+   * Antes bastaba con el evento `dragstart`, que salta al primer pixel: un
+   * pulgar apoyado en la pantalla apagaba el seguimiento para el resto de la
+   * sesion, y nada lo indicaba. Ahora se mide cuanto ha paneado el mapa de
+   * verdad y solo se suelta al pasar del umbral; un roce no cuenta.
+   *
+   * El zoom con dos dedos NO lo suelta (dispara `zoomstart`, no `dragstart`),
+   * asi que puedes acercarte y alejarte sin perder el seguimiento.
+   */
+  private watchForIntentionalPan() {
+    let anchor: LngLat | null = null;
+
+    this.map.on('dragstart', () => {
+      anchor = this.map.getCenter();
+    });
+
+    this.map.on('drag', () => {
+      if (!this.following || !anchor) return;
+      // project() del centro actual devuelve siempre el centro del lienzo, asi
+      // que esta distancia es literalmente cuantos pixeles se ha movido el mapa.
+      const from = this.map.project(anchor);
+      const to = this.map.project(this.map.getCenter());
+      if (Math.hypot(from.x - to.x, from.y - to.y) > PAN_INTENT_PX) {
+        this.following = false;
+      }
+    });
+
+    this.map.on('dragend', () => {
+      anchor = null;
+    });
   }
 
   /** Aplica un estilo nuevo conservando la camara. Lo usa el HMR. */
@@ -94,6 +152,9 @@ export class MapView {
         bearing: this.lastHeading,
         duration: 900,
         easing: (t) => t * (2 - t),
+        // En una app de navegacion el movimiento de camara no es decorativo:
+        // sin esto, "Reducir movimiento" de iOS lo descartaria.
+        essential: true,
       });
     }
   }
@@ -101,11 +162,19 @@ export class MapView {
   recenter() {
     this.following = true;
     const ll = this.marker?.getLngLat();
-    if (ll) this.map.easeTo({ center: ll, bearing: this.lastHeading, zoom: 16.5, duration: 600 });
+    if (ll) {
+      this.map.easeTo({
+        center: ll,
+        bearing: this.lastHeading,
+        zoom: 16.5,
+        duration: 600,
+        essential: true,
+      });
+    }
   }
 
   togglePitch() {
     const flat = this.map.getPitch() < 20;
-    this.map.easeTo({ pitch: flat ? 60 : 0, duration: 500 });
+    this.map.easeTo({ pitch: flat ? 60 : 0, duration: 500, essential: true });
   }
 }

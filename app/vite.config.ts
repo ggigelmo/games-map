@@ -34,5 +34,10 @@ function styleBuilder(): Plugin {
 export default defineConfig({
   plugins: [styleBuilder()],
   // El estilo canonico vive en ../style, fuera de la raiz de Vite.
-  server: { fs: { allow: [resolve(here, '..')] }, port: 5173 },
+  server: {
+    // El estilo canonico vive en ../style, fuera de la raiz de Vite.
+    fs: { allow: [resolve(here, '..')] },
+    // Sin fijarlo a fuego: 5173 choca con otros proyectos que ya lo usan.
+    port: Number(process.env.PORT) || 5173,
+  },
 });

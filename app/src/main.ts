@@ -33,6 +33,7 @@ view.map.on('error', (e) => console.error('[map]', e.error?.message ?? e));
 if (import.meta.env.DEV) {
   Object.assign(window as unknown as Record<string, unknown>, {
     __map: view.map,
+    __view: view,
     __style: style,
   });
 }
@@ -69,7 +70,18 @@ const button = (text: string, ghost: boolean, onClick: () => void) => {
   return b;
 };
 
-button('Recentrar', false, () => view.recenter());
+const recenterBtn = button('Recentrar', true, () => view.recenter());
+
+// Este boton es el UNICO indicador de si la camara te sigue: apagado
+// (fantasma) mientras te persigue, encendido en amarillo en cuanto sueltas la
+// camara arrastrando. Sin esto el seguimiento se apagaba en silencio y la app
+// parecia rota.
+const paintFollowState = (following: boolean) =>
+  recenterBtn.classList.toggle('btn--ghost', following);
+
+view.onFollowingChange = paintFollowState;
+paintFollowState(view.following);
+
 button('2D / 3D', true, () => view.togglePitch());
 
 diag.el.hidden = true;

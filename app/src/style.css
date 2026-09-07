@@ -59,7 +59,11 @@ html, body {
   flex-direction: column;
   gap: 10px;
 }
-#ui > * { pointer-events: auto; }
+/* Solo lo que es de verdad interactivo intercepta el dedo. Con `#ui > *` el
+   `.spacer` -un div invisible con flex:1- se tragaba todos los gestos del mapa,
+   y cualquier contenedor de maquetacion futuro volveria a hacerlo. */
+#ui .panel,
+#ui .btn { pointer-events: auto; }
 
 /* ------------------------------------------------- chrome CP2077 */
 /* Esquinas cortadas en diagonal: la firma visual del juego. */
@@ -121,6 +125,7 @@ html, body {
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   box-shadow: 0 0 20px rgba(252, 238, 10, 0.35);
   cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .btn:active { transform: translateY(1px); }
 .btn--ghost {
