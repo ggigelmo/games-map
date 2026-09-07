@@ -1,0 +1,107 @@
+{
+  "poi-food": {
+    "x": 0,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-bar": {
+    "x": 50,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-medpoint": {
+    "x": 100,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-fastTravel": {
+    "x": 150,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-landmark": {
+    "x": 200,
+    "y": 0,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-junk": {
+    "x": 0,
+    "y": 50,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-clothes": {
+    "x": 50,
+    "y": 50,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-eddies": {
+    "x": 100,
+    "y": 50,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-ncpd": {
+    "x": 150,
+    "y": 50,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-vehicle": {
+    "x": 200,
+    "y": 50,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-hotel": {
+    "x": 0,
+    "y": 100,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-entertainment": {
+    "x": 50,
+    "y": 100,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-corpo": {
+    "x": 100,
+    "y": 100,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-nature": {
+    "x": 150,
+    "y": 100,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  },
+  "poi-generic": {
+    "x": 200,
+    "y": 100,
+    "width": 48,
+    "height": 48,
+    "pixelRatio": 2
+  }
+}

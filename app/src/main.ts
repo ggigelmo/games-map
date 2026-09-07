@@ -7,7 +7,19 @@ import { MapView, type Fix } from './map/map';
 import { Hud } from './hud/hud';
 import { mountDiagnostics } from './diag/probe';
 
-const style = styleJson as unknown as StyleSpecification;
+/**
+ * MapLibre EXIGE que la URL del sprite sea absoluta, al contrario que las de
+ * teselas y glifos, que acepta relativas ("Invalid sprite URL, must be
+ * absolute"). El estilo guarda una ruta relativa a la raiz para seguir siendo
+ * portable entre localhost y Netlify, asi que se resuelve aqui contra el origen
+ * actual antes de entregarselo al mapa.
+ */
+function resolveSprite(s: StyleSpecification): StyleSpecification {
+  if (typeof s.sprite !== 'string' || /^[a-z]+:/i.test(s.sprite)) return s;
+  return { ...s, sprite: new URL(s.sprite, location.origin).href };
+}
+
+const style = resolveSprite(styleJson as unknown as StyleSpecification);
 
 const mapEl = document.getElementById('map')!;
 const ui = document.getElementById('ui')!;
@@ -159,7 +171,7 @@ if (new URLSearchParams(location.search).has('lab')) {
 if (import.meta.hot) {
   import.meta.hot.accept('../../style/cyberpunk.json', (mod) => {
     if (mod?.default) {
-      view.setStyle(mod.default as unknown as StyleSpecification);
+      view.setStyle(resolveSprite(mod.default as unknown as StyleSpecification));
       console.info('[style] recargado');
     }
   });

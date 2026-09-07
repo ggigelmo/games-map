@@ -50,6 +50,38 @@ app/                 la app (Vite + TypeScript + MapLibre GL JS)
 docs/hallazgos.md    trampas encontradas y por que el codigo es como es
 ```
 
+## Iconos de POI
+
+Cada establecimiento lleva el icono de su categoria: cruz de medpoint en
+farmacias y centros de salud, copa en bares, vaso de fideos en restaurantes,
+caja en tiendas, flecha en paradas y estaciones, torres en colegios y oficinas.
+
+Todo sale de `assets/lib/poi-icons.mjs`, que es la **fuente unica de verdad**:
+
+- `ICONS` = los 15 glifos, dibujados como codigo (sin SVG ni dependencias).
+- `MEMBERS` = que tipos de establecimiento lleva cada icono, con etiquetas
+  `class` del esquema OpenMapTiles (130 tipos mapeados).
+
+De ese archivo tiran los dos generadores, asi que no pueden desincronizarse:
+`assets/make-sprite.mjs` dibuja el sprite, y `style/build.mjs` construye la
+expresion `icon-image` del estilo.
+
+```bash
+node assets/make-sprite.mjs && node style/build.mjs
+```
+
+**Para cambiar que icono lleva un tipo de negocio**, mueve su etiqueta de una
+lista a otra en `MEMBERS`. Una etiqueta en dos listas lanza un error al generar,
+porque una expresion `match` de MapLibre rechaza etiquetas repetidas y eso
+romperia el estilo entero al cargar.
+
+**Para anadir un icono nuevo**, mete su glifo en `ICONS` y su lista en
+`MEMBERS`. Se dibuja en una caja de 24x24 con `segment`, `polyline`, `polygon` y
+`circle`; el generador ya pinta la placa y el borde antes de llamar al glifo.
+
+Los glifos son originales, en el lenguaje visual del juego. No son los assets de
+Cyberpunk 2077, que son de CD Projekt Red.
+
 ## Servicios
 
 Teselas de [OpenFreeMap](https://openfreemap.org) (esquema OpenMapTiles, sin API

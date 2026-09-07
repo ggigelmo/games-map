@@ -12,15 +12,15 @@
     }
   },
   "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
-  "sprite": "https://tiles.openfreemap.org/sprites/ofm_f384/ofm",
+  "sprite": "/sprites/night-city",
   "light": {
     "anchor": "viewport",
-    "color": "#ffffff",
-    "intensity": 0.28,
+    "color": "#00f0ff",
+    "intensity": 0.18,
     "position": [
-      1.15,
-      210,
-      30
+      1.2,
+      200,
+      40
     ]
   },
   "layers": [
@@ -1570,13 +1570,13 @@
             5
           ],
           0,
-          "#070b18",
+          "#090d1a",
           30,
-          "#0c1a34",
+          "#0d1830",
           90,
-          "#17456b",
+          "#14314d",
           200,
-          "#1f6f96"
+          "#4f657a"
         ],
         "fill-extrusion-height": [
           "coalesce",
@@ -1605,7 +1605,7 @@
       "source-layer": "building",
       "minzoom": 15,
       "paint": {
-        "line-color": "#1a7d92",
+        "line-color": "#0f5666",
         "line-width": [
           "interpolate",
           [
@@ -1622,7 +1622,7 @@
           20,
           1.2
         ],
-        "line-opacity": 0.65
+        "line-opacity": 0.5
       }
     },
     {
@@ -1758,34 +1758,295 @@
       }
     },
     {
-      "id": "poi-label",
+      "id": "poi",
       "type": "symbol",
       "source": "openmaptiles",
       "source-layer": "poi",
-      "minzoom": 16,
+      "minzoom": 14,
       "filter": [
-        "<=",
+        "all",
         [
-          "get",
-          "rank"
+          "match",
+          [
+            "geometry-type"
+          ],
+          [
+            "Point",
+            "MultiPoint"
+          ],
+          true,
+          false
         ],
-        12
+        [
+          "<=",
+          [
+            "coalesce",
+            [
+              "get",
+              "rank"
+            ],
+            99
+          ],
+          [
+            "step",
+            [
+              "zoom"
+            ],
+            4,
+            15,
+            8,
+            16,
+            14,
+            17,
+            25,
+            18,
+            100
+          ]
+        ]
       ],
       "layout": {
+        "icon-image": [
+          "match",
+          [
+            "get",
+            "class"
+          ],
+          [
+            "restaurant",
+            "fast_food",
+            "sushi",
+            "bakery",
+            "butcher",
+            "ice_cream",
+            "cafe",
+            "food_court",
+            "deli",
+            "confectionery",
+            "pastry",
+            "greengrocer"
+          ],
+          "poi-food",
+          [
+            "bar",
+            "beer",
+            "alcohol_shop",
+            "nightclub",
+            "pub",
+            "music"
+          ],
+          "poi-bar",
+          [
+            "hospital",
+            "pharmacy",
+            "doctors",
+            "dentist",
+            "clinic",
+            "veterinary",
+            "optician"
+          ],
+          "poi-medpoint",
+          [
+            "bus",
+            "railway",
+            "railway_metro",
+            "railway_light",
+            "ferry",
+            "harbor",
+            "airport",
+            "airfield",
+            "heliport",
+            "aerialway",
+            "subway",
+            "tram_stop",
+            "bus_station"
+          ],
+          "poi-fastTravel",
+          [
+            "attraction",
+            "monument",
+            "museum",
+            "art_gallery",
+            "castle",
+            "lighthouse",
+            "viewpoint",
+            "zoo",
+            "aquarium",
+            "place_of_worship",
+            "information",
+            "religious_christian",
+            "religious_jewish",
+            "religious_muslim",
+            "memorial",
+            "artwork"
+          ],
+          "poi-landmark",
+          [
+            "shop",
+            "grocery",
+            "gift",
+            "furniture",
+            "florist",
+            "laundry",
+            "hairdresser",
+            "warehouse",
+            "convenience",
+            "supermarket",
+            "department_store",
+            "hardware",
+            "books",
+            "bicycle",
+            "mobile_phone",
+            "electronics"
+          ],
+          "poi-junk",
+          [
+            "clothing_store",
+            "shoes",
+            "jewelry",
+            "bag"
+          ],
+          "poi-clothes",
+          [
+            "bank",
+            "atm",
+            "post",
+            "bureau_de_change"
+          ],
+          "poi-eddies",
+          [
+            "police",
+            "prison",
+            "fire_station",
+            "ranger_station",
+            "embassy"
+          ],
+          "poi-ncpd",
+          [
+            "car",
+            "fuel",
+            "parking",
+            "parking_garage",
+            "bicycle_rental",
+            "car_repair",
+            "charging_station"
+          ],
+          "poi-vehicle",
+          [
+            "lodging",
+            "campsite",
+            "shelter",
+            "hostel"
+          ],
+          "poi-hotel",
+          [
+            "cinema",
+            "theatre",
+            "amusement_park",
+            "stadium",
+            "pitch",
+            "swimming",
+            "golf",
+            "tennis",
+            "soccer",
+            "baseball",
+            "basketball",
+            "american_football",
+            "cricket",
+            "skiing",
+            "casino",
+            "bowling"
+          ],
+          "poi-entertainment",
+          [
+            "town_hall",
+            "college",
+            "school",
+            "library",
+            "industry",
+            "commercial",
+            "office",
+            "courthouse",
+            "university"
+          ],
+          "poi-corpo",
+          [
+            "park",
+            "garden",
+            "dog_park",
+            "playground",
+            "picnic_site",
+            "mountain",
+            "volcano",
+            "cemetery",
+            "water",
+            "wetland",
+            "beach"
+          ],
+          "poi-nature",
+          "poi-generic"
+        ],
+        "icon-size": [
+          "interpolate",
+          [
+            "exponential",
+            1.5
+          ],
+          [
+            "zoom"
+          ],
+          14,
+          0.42,
+          16,
+          0.6,
+          18,
+          0.78,
+          20,
+          0.9
+        ],
+        "icon-allow-overlap": false,
+        "icon-padding": 2,
+        "symbol-sort-key": [
+          "coalesce",
+          [
+            "get",
+            "rank"
+          ],
+          99
+        ],
         "text-field": [
-          "get",
-          "name"
+          "coalesce",
+          [
+            "get",
+            "name:latin"
+          ],
+          [
+            "get",
+            "name"
+          ]
         ],
         "text-font": [
           "Noto Sans Regular"
         ],
-        "text-size": 10,
+        "text-size": [
+          "interpolate",
+          [
+            "exponential",
+            1.5
+          ],
+          [
+            "zoom"
+          ],
+          15,
+          9,
+          18,
+          11
+        ],
         "text-letter-spacing": 0.08,
         "text-transform": "uppercase",
         "text-anchor": "top",
         "text-offset": [
           0,
-          0.5
+          1.15
         ],
         "text-max-width": 9,
         "text-optional": true
@@ -1793,7 +2054,21 @@
       "paint": {
         "text-color": "#4a6b85",
         "text-halo-color": "#03040a",
-        "text-halo-width": 1.4
+        "text-halo-width": 1.4,
+        "icon-opacity": [
+          "interpolate",
+          [
+            "exponential",
+            1.5
+          ],
+          [
+            "zoom"
+          ],
+          14,
+          0.8,
+          16,
+          1
+        ]
       }
     },
     {

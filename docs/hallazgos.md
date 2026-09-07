@@ -1,25 +1,45 @@
 # Hallazgos
 
-Trampas encontradas durante la fase 0. Estan aqui porque cada una explica por
-que una parte del codigo es como es, y porque son exactamente el tipo de cosa
-que se vuelve a romper si alguien "limpia" el codigo sin saberlo.
+Trampas encontradas durante el desarrollo. Estan aqui porque cada una explica
+por que una parte del codigo es como es, y porque son exactamente el tipo de
+cosa que se vuelve a romper si alguien "limpia" el codigo sin saberlo.
 
-## 1. Colorear la luz tine los edificios del color COMPLEMENTARIO
+## 1. La luz cian tine los edificios de ROJO, y aqui es a proposito
 
-**Sintoma:** con `light.color = '#00f0ff'` (cian) los edificios en
+**Descubrimiento:** con `light.color = '#00f0ff'` (cian) los edificios en
 `fill-extrusion` salian granate, aunque `fill-extrusion-color` estaba puesto en
 azules oscuros (`#090d1a` a `#4f657a`) y el estilo validaba sin un solo error.
 
 **Causa:** el shader de `fill-extrusion` acota el color por abajo con
 `0.3 * (1 - colorDeLuz)`. Con luz cian `(0, 1, 1)`, ese `1 - color` da
 `(1, 0, 0)`, asi que el canal **rojo** queda con un minimo de 0.3 mientras verde
-y azul se quedan a cero. De ahi el granate.
+y azul se quedan a cero. De ahi el granate. El efecto es de dos tonos: caras en
+sombra en rojo, caras iluminadas con tinte cian, algo que no se reproduce con un
+color plano.
 
-**Regla:** el tinte de los edificios va en `fill-extrusion-color`. La luz se
-queda neutra (`#ffffff`) y solo se usa `intensity` para el modelado. Bajar
-`intensity` oscurece el suelo, que es lo que hace que el neon muerda.
+**Estado: es una decision, no un bug.** Se descubrio investigando por que los
+edificios no salian azules, y el resultado gusto, asi que se conservo. El
+`light` de `style/build.mjs` lleva un comentario avisando de que la luz cian es
+deliberada.
 
-## 2. MapLibre no consume TTF: necesita glifos SDF
+**Si alguna vez se quieren edificios azules:** poner la luz en `#ffffff`. Los
+colores de `fill-extrusion-color` ya estan en azules, asi que aparecen solos. Lo
+que **no** funciona es intentar tenirlos cambiando el color de la luz: da el
+complementario.
+
+## 2. MapLibre exige que la URL del sprite sea ABSOLUTA
+
+A diferencia de las URLs de teselas y de glifos, que acepta relativas, un
+`sprite: '/sprites/night-city'` se rechaza con:
+
+> Invalid sprite URL "/sprites/night-city", must be absolute.
+
+Meter el dominio en el JSON lo ataria al entorno y dejaria de valer a la vez en
+localhost y en Netlify. Por eso el estilo guarda la ruta relativa a la raiz y
+`resolveSprite()` en `app/src/main.ts` la resuelve contra `location.origin`
+antes de entregar el estilo al mapa. Se aplica igual en el arranque y en el HMR.
+
+## 3. MapLibre no consume TTF: necesita glifos SDF
 
 Las fuentes del mapa no son CSS. MapLibre pide los glifos como campos de
 distancia firmada empaquetados en `.pbf` por rango Unicode, desde la URL de la
@@ -37,7 +57,7 @@ HTML/CSS normal, asi que ahi Rajdhani y Share Tech Mono entran por Google Fonts
 desde el primer dia. Es la razon de que la app ya se vea Cyberpunk aunque las
 etiquetas del mapa sigan en Noto Sans.
 
-## 3. MapLibre mide el contenedor una sola vez
+## 4. MapLibre mide el contenedor una sola vez
 
 `new maplibregl.Map()` lee el tamano del contenedor al construirse. Si en ese
 momento mide 0 (pestana en segundo plano, arranque de una PWA, rotacion de
@@ -47,7 +67,7 @@ de 400x300 y no vuelve a pintar nunca.
 De ahi el `ResizeObserver` en `app/src/map/map.ts`. No es defensa preventiva: se
 reprodujo el fallo con el contenedor a 0x0.
 
-## 4. MapLibre no carga el estilo si `requestAnimationFrame` no dispara
+## 5. MapLibre no carga el estilo si `requestAnimationFrame` no dispara
 
 La carga del estilo esta diferida a un frame. En una pestana con
 `document.hidden === true`, rAF no dispara nunca (medido: 0 frames en 2 s,
@@ -57,15 +77,16 @@ medias: el objeto `Map` existe, pero `style.stylesheet` nunca se asigna,
 
 Sintoma: mapa en negro, cero peticiones de teselas, consola limpia.
 
-Para verificar en un entorno asi hay que bombear frames a mano. Lo que funciona
-es `map.triggerRepaint()` en un bucle de timers. Lo que **no** hay que hacer es
-sustituir `requestAnimationFrame` por una bomba de `MessageChannel` sin tope:
-MapLibre reprograma un frame dentro de cada frame, el `postMessage` se
-realimenta y congela el renderer.
+Para verificar en un entorno asi, lo que funciona es dejar cargar la pagina y
+esperar de forma pasiva. Lo que **no** hay que hacer es sustituir
+`requestAnimationFrame` por una bomba de `MessageChannel`: MapLibre reprograma
+un frame dentro de cada frame, el `postMessage` se realimenta y congela el
+renderer. Llamar `triggerRepaint()` en bucle tambien acaba atascandolo.
 
-Nada de esto afecta a la app en un movil real; es solo para automatizar capturas.
+Nada de esto afecta a la app en un movil real; es solo para automatizar
+capturas.
 
-## 5. Riesgos de iOS pendientes de medir en el dispositivo
+## 6. Riesgos de iOS pendientes de medir en el dispositivo
 
 El panel `DIAG` existe para responderlos con datos, no con suposiciones:
 
@@ -80,3 +101,10 @@ El panel `DIAG` existe para responderlos con datos, no con suposiciones:
   mitad de trayecto.
 - **Sintesis de voz** -> iOS exige que el primer `speak()` venga de un gesto del
   usuario. De ahi que la prueba de voz sea un boton y no automatica.
+
+## 7. Los iconos son originales, no los del juego
+
+Los glifos de `assets/lib/poi-icons.mjs` estan dibujados en el lenguaje visual
+de Cyberpunk 2077 (placa de esquinas cortadas, borde cian, glifo grueso con
+halo), pero son originales. Los assets del juego son propiedad de CD Projekt Red
+y no se reproducen aqui.

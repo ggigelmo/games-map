@@ -14,6 +14,8 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
+import { CLASS_TO_ICON, FALLBACK_ICON, spriteName } from '../assets/lib/poi-icons.mjs';
+
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'cyberpunk.json');
 
 // ---------------------------------------------------------------- paleta
@@ -26,9 +28,9 @@ const P = {
   park: '#050f0c',
   industrial: '#0f0819',
   commercial: '#12081c',
-  buildLow: '#070b18',
-  buildHigh: '#17456b',
-  buildWire: '#1a7d92',
+  buildLow: '#090d1a',
+  buildHigh: '#14314d',
+  buildWire: '#0f5666',
   rail: '#2c1338',
   boundary: '#ff003c',
   textCyan: '#a8f2fb',
@@ -168,6 +170,24 @@ function neonRoad(r, stratum) {
   };
 }
 
+/**
+ * icon-image: elige el icono segun el tipo de establecimiento.
+ *
+ * Se agrupan las clases por icono para que salga una expresion compacta
+ * (15 ramas en vez de 130) y para que la tabla de assets/lib/poi-icons.mjs
+ * siga siendo el unico sitio donde se decide que icono lleva cada negocio.
+ */
+const iconExpr = (() => {
+  const byIcon = new Map();
+  for (const [cls, icon] of CLASS_TO_ICON) {
+    if (!byIcon.has(icon)) byIcon.set(icon, []);
+    byIcon.get(icon).push(cls);
+  }
+  const branches = [];
+  for (const [icon, classes] of byIcon) branches.push(classes, spriteName(icon));
+  return ['match', ['get', 'class'], ...branches, spriteName(FALLBACK_ICON)];
+})();
+
 const fillPoly = (id, sourceLayer, color, opacity, extra = {}) => ({
   id,
   type: 'fill',
@@ -294,9 +314,9 @@ const layers = [
       'fill-extrusion-color': [
         'interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 5],
         0, P.buildLow,
-        30, '#0c1a34',
+        30, '#0d1830',
         90, P.buildHigh,
-        200, '#1f6f96',
+        200, lighten(P.buildHigh, 0.25),
       ],
       'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 5],
       'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
@@ -313,7 +333,7 @@ const layers = [
     paint: {
       'line-color': P.buildWire,
       'line-width': zoomW([[15, 0.3], [18, 0.7], [20, 1.2]]),
-      'line-opacity': 0.65,
+      'line-opacity': 0.5,
     },
   },
 
@@ -379,27 +399,47 @@ const layers = [
     },
   },
   {
-    id: 'poi-label',
+    // Icono y etiqueta en la MISMA capa: asi colisionan como una unidad y no
+    // se queda un nombre huerfano lejos de su icono.
+    id: 'poi',
     type: 'symbol',
     source: 'openmaptiles',
     'source-layer': 'poi',
-    minzoom: 16,
-    filter: ['<=', ['get', 'rank'], 12],
+    minzoom: 14,
+    filter: [
+      'all',
+      ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
+      // Revelado progresivo: primero los sitios importantes, y al acercarte,
+      // todo. rank bajo = mas relevante; sin rank se deja para el final.
+      [
+        '<=',
+        ['coalesce', ['get', 'rank'], 99],
+        ['step', ['zoom'], 4, 15, 8, 16, 14, 17, 25, 18, 100],
+      ],
+    ],
     layout: {
-      'text-field': ['get', 'name'],
+      'icon-image': iconExpr,
+      'icon-size': zoomW([[14, 0.42], [16, 0.6], [18, 0.78], [20, 0.9]]),
+      'icon-allow-overlap': false,
+      'icon-padding': 2,
+      // Los mas relevantes ganan el sitio cuando dos iconos se pisan.
+      'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
+      'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name']],
       'text-font': ['Noto Sans Regular'],
-      'text-size': 10,
+      'text-size': zoomW([[15, 9], [18, 11]]),
       'text-letter-spacing': 0.08,
       'text-transform': 'uppercase',
       'text-anchor': 'top',
-      'text-offset': [0, 0.5],
+      'text-offset': [0, 1.15],
       'text-max-width': 9,
+      // Si el nombre no cabe, se pierde el nombre pero se conserva el icono.
       'text-optional': true,
     },
     paint: {
       'text-color': P.textDim,
       'text-halo-color': P.halo,
       'text-halo-width': 1.4,
+      'icon-opacity': zoomW([[14, 0.8], [16, 1]]),
     },
   },
   {
@@ -487,12 +527,14 @@ const style = {
   // TODO fase 0b: apuntar a glifos SDF propios (Rajdhani / Chakra Petch)
   // generados con MapLibre Font Maker. OpenFreeMap solo sirve Noto Sans.
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-  sprite: 'https://tiles.openfreemap.org/sprites/ofm_f384/ofm',
+  // Sprite propio, generado por assets/make-sprite.mjs. Ruta relativa a la
+  // raiz del sitio, asi vale igual en desarrollo y en Netlify.
+  sprite: '/sprites/night-city',
   // NO colorear la luz para tenir los edificios: el shader de fill-extrusion
   // acota el color por abajo con 0.3 * (1 - colorDeLuz), asi que una luz cian
   // (0,1,1) fuerza el canal ROJO a 0.3 y los edificios salen granate. El tinte
   // va en fill-extrusion-color; la luz se queda neutra.
-  light: { anchor: 'viewport', color: '#ffffff', intensity: 0.28, position: [1.15, 210, 30] },
+  light: { anchor: 'viewport', color: '#00f0ff', intensity: 0.18, position: [1.2, 200, 40] },
   layers,
 };
 
