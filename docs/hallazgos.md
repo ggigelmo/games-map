@@ -108,3 +108,38 @@ Los glifos de `assets/lib/poi-icons.mjs` estan dibujados en el lenguaje visual
 de Cyberpunk 2077 (placa de esquinas cortadas, borde cian, glifo grueso con
 halo), pero son originales. Los assets del juego son propiedad de CD Projekt Red
 y no se reproducen aqui.
+
+## 8. Un lockfile generado en Windows rompe el build en Linux
+
+**Sintoma:** el build de Cloudflare instalaba bien y `tsc` pasaba, pero
+`vite build` moria con:
+
+> Cannot find module @rollup/rollup-linux-x64-gnu
+
+**Causa:** rollup y esbuild traen sus binarios nativos como
+`optionalDependencies`, una por plataforma. El `package-lock.json` se genero en
+Windows **encima de un `node_modules` que ya existia** de una instalacion previa
+sin workspaces, asi que npm solo registro las variantes que de verdad tenia
+instaladas: 2 de rollup, las dos `win32`. Las 52 de esbuild si estaban, lo que
+hace el fallo mas confuso todavia. Es el bug npm/cli#4828.
+
+**Solucion:** regenerar el lockfile en limpio, que es justo lo que dice el
+mensaje de error.
+
+```bash
+rm -rf node_modules app/node_modules package-lock.json
+npm install
+```
+
+El lockfile bueno tiene ~25 variantes de `@rollup/rollup-*`, entre ellas
+`linux-x64-gnu`, y hoistea las dependencias a `node_modules/` de la raiz en vez
+de dejarlas anidadas en `app/node_modules/`.
+
+**Como comprobarlo antes de subir:**
+
+```bash
+node -e "const k=Object.keys(require('./package-lock.json').packages); \
+console.log(k.filter(x=>x.includes('@rollup/rollup-')).length)"
+```
+
+Si sale 2, el lockfile esta mal. Si sale ~25, esta bien.
