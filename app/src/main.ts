@@ -6,6 +6,7 @@ import styleJson from '../../style/cyberpunk.json';
 import { MapView } from './map/map';
 import { Hud } from './hud/hud';
 import { mountDiagnostics } from './diag/probe';
+import { Compass } from './services/compass';
 import { GeoWatcher } from './services/geolocation';
 import { route as calcularRuta } from './services/routing';
 import { StadiaError } from './services/stadia';
@@ -42,14 +43,23 @@ view.map.on('error', (e) => console.error('[map]', e.error?.message ?? e));
 // ------------------------------------------------------------- posicion
 
 const geo = new GeoWatcher();
-const diag = mountDiagnostics(geo);
+const compass = new Compass();
+const diag = mountDiagnostics(geo, compass);
 
 geo.onFix((fix) => {
   view.update(fix);
   hud.update(fix);
 });
 
+// El mapa decide si hace caso: en marcha manda el GPS, parado manda la brujula.
+compass.onHeading((deg) => view.setCompassHeading(deg));
+
 geo.start();
+
+// En Android y escritorio el evento de orientacion llega sin pedir permiso, asi
+// que la brujula arranca sola. En iOS hace falta un gesto del usuario, y para
+// eso esta el boton del panel DIAG.
+if (compass.supported && !compass.needsPermission) void compass.enable();
 
 if (import.meta.env.DEV) {
   Object.assign(window as unknown as Record<string, unknown>, {

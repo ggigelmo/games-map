@@ -165,3 +165,30 @@ en vez de parchear los dos casos:
 ```css
 [hidden] { display: none !important; }
 ```
+
+## 10. La brujula: dos APIs distintas y un sentido de giro invertido
+
+El evento `deviceorientation` no da un rumbo de brujula directamente, y en iOS
+va por otro camino que en el resto:
+
+- **iOS** expone `event.webkitCompassHeading`: ya es un rumbo respecto al norte
+  y en sentido horario. Se usa tal cual.
+- **El estandar** da `event.alpha`, que mide en sentido **ANTIhorario**. Hay que
+  invertirlo: `(360 - alpha) % 360`. Sin eso el mapa gira al reves, que es un
+  fallo sutil porque a simple vista parece que "funciona".
+- `alpha` solo sirve si `event.absolute` es true; si no, el origen es arbitrario
+  y el valor no significa nada.
+
+Ademas, **iOS exige pedir permiso con `DeviceOrientationEvent.requestPermission()`
+desde un gesto del usuario**. Llamarlo fuera de un manejador de click lanza, no
+pregunta. Por eso el permiso se concede desde un boton del panel `DIAG` y no al
+arrancar la app.
+
+Dos filtros que no son opcionales: una **banda muerta** de un par de grados,
+porque el ruido del magnetometro hace vibrar el mapa con el movil quieto encima
+de la mesa; y un **limite de frecuencia**, porque el evento llega decenas de
+veces por segundo y girar la camara en cada uno la deja temblando.
+
+La regla de quien manda (GPS en marcha, brujula parado) vive en
+`app/src/services/heading.ts` como logica pura y con tests, porque comprobarla
+de verdad exigiria moverse y girar un movil.

@@ -14,6 +14,7 @@
  *     la pantalla se apaga a mitad de trayecto.
  */
 
+import type { Compass } from '../services/compass';
 import type { GeoWatcher } from '../services/geolocation';
 
 type Verdict = 'ok' | 'warn' | 'bad' | 'pending';
@@ -28,8 +29,12 @@ export interface Diagnostics {
   el: HTMLElement;
 }
 
-/** @param geo dueno del watchPosition; este panel solo mide lo que sale de el */
-export function mountDiagnostics(geo: GeoWatcher): Diagnostics {
+/**
+ * @param geo     dueno del watchPosition; este panel solo mide lo que sale de el
+ * @param compass brujula; el permiso se concede desde aqui, porque iOS exige
+ *                que la peticion salga de un gesto del usuario
+ */
+export function mountDiagnostics(geo: GeoWatcher, compass: Compass): Diagnostics {
   const el = document.createElement('section');
   el.className = 'panel';
   el.id = 'diag';
@@ -38,10 +43,19 @@ export function mountDiagnostics(geo: GeoWatcher): Diagnostics {
 
   // Se declara aqui arriba porque render() lo reengancha en cada pintada, y
   // render() ya corre desde el primer set(), antes de la seccion de voz.
+  const botones = document.createElement('div');
+  botones.className = 'row';
+  botones.style.marginTop = '10px';
+
   const voiceBtn = document.createElement('button');
   voiceBtn.className = 'btn btn--ghost';
-  voiceBtn.style.marginTop = '10px';
   voiceBtn.textContent = 'Probar voz';
+
+  const compassBtn = document.createElement('button');
+  compassBtn.className = 'btn btn--ghost';
+  compassBtn.textContent = 'Activar brujula';
+
+  botones.append(voiceBtn, compassBtn);
 
   const set = (key: string, label: string, value: string, verdict: Verdict) => {
     rows.set(key, { label, value, verdict });
@@ -56,7 +70,7 @@ export function mountDiagnostics(geo: GeoWatcher): Diagnostics {
       )
       .join('');
     el.innerHTML = `<h2>Diagnostico del dispositivo</h2><dl>${items}</dl>`;
-    el.appendChild(voiceBtn);
+    el.appendChild(botones);
   }
 
   // ------------------------------------------------------- entorno
@@ -194,20 +208,43 @@ export function mountDiagnostics(geo: GeoWatcher): Diagnostics {
     });
   }
 
-  // ---------------------------------------------------- brujula / rumbo
+  // ---------------------------------------------------- brujula
+  //
+  // El GPS solo sabe tu rumbo cuando te MUEVES. Parado, la brujula es lo unico
+  // que dice hacia donde miras. En iOS hace falta permiso explicito pedido
+  // desde un gesto del usuario: de ahi que esto sea un boton y no automatico.
 
-  const doe = window.DeviceOrientationEvent as
-    | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> })
-    | undefined;
-  if (!doe) {
+  if (!compass.supported) {
     set('compass', 'Brujula', 'NO SOPORTADA', 'warn');
+    compassBtn.disabled = true;
   } else {
     set(
       'compass',
       'Brujula',
-      typeof doe.requestPermission === 'function' ? 'requiere permiso' : 'disponible',
-      'ok',
+      compass.needsPermission ? 'pulsa para activar' : 'disponible',
+      'pending',
     );
+
+    compassBtn.addEventListener('click', async () => {
+      compassBtn.disabled = true;
+      const resultado = await compass.enable();
+      if (resultado === 'granted') {
+        set('compass', 'Brujula', 'ACTIVA', 'ok');
+        compassBtn.textContent = 'Brujula activa';
+      } else {
+        compassBtn.disabled = false;
+        set(
+          'compass',
+          'Brujula',
+          resultado === 'denied' ? 'PERMISO DENEGADO' : 'NO SOPORTADA',
+          'bad',
+        );
+      }
+    });
+
+    // El rumbo en vivo es lo que demuestra que funciona de verdad, en vez de
+    // limitarse a decir que el permiso se concedio.
+    compass.onHeading((deg) => set('heading', 'Rumbo brujula', `${Math.round(deg)}°`, 'ok'));
   }
 
   render();

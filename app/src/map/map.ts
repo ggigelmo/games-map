@@ -1,5 +1,11 @@
 import maplibregl, { Map, Marker, type LngLat, type StyleSpecification } from 'maplibre-gl';
 
+import { angleDelta } from '../services/compass';
+import {
+  compassWins,
+  gpsHeadingUsable,
+  GPS_HEADING_TTL_MS,
+} from '../services/heading';
 import type { Fix } from '../services/geolocation';
 
 /**
@@ -8,6 +14,9 @@ import type { Fix } from '../services/geolocation';
  * gesto de verdad se pasa de esto de sobra.
  */
 const PAN_INTENT_PX = 32;
+
+/** Grados minimos para molestarse en girar la camara con la brujula. */
+const CAMERA_TURN_DEG = 4;
 
 /** Chevron del jugador: cian con halo, apuntando al rumbo. */
 function playerMarkerEl(): HTMLElement {
@@ -41,6 +50,9 @@ export class MapView {
   private markerInner = playerMarkerEl();
   private lastHeading = 0;
   private _following = true;
+  /** Hasta cuando el rumbo del GPS tiene prioridad sobre la brujula. */
+  private gpsHeadingUntil = 0;
+  private compassActive = false;
 
   /**
    * Avisa de los cambios de `following` para que la UI pueda reflejarlos.
@@ -139,7 +151,13 @@ export class MapView {
     }
 
     // coords.heading es null cuando estas parado; conservamos el ultimo bueno.
-    if (fix.heading !== null && !Number.isNaN(fix.heading)) this.lastHeading = fix.heading;
+    if (fix.heading !== null && !Number.isNaN(fix.heading)) {
+      const enMarcha = gpsHeadingUsable(fix.heading, fix.speed);
+      // Con la brujula activa, a poca velocidad se prefiere ella. Sin brujula,
+      // el rumbo del GPS es lo unico que hay, aunque sea malo.
+      if (enMarcha || !this.compassActive) this.lastHeading = fix.heading;
+      if (enMarcha) this.gpsHeadingUntil = performance.now() + GPS_HEADING_TTL_MS;
+    }
     this.marker.setRotation(this.lastHeading);
 
     if (this.following) {
@@ -152,6 +170,25 @@ export class MapView {
         // sin esto, "Reducir movimiento" de iOS lo descartaria.
         essential: true,
       });
+    }
+  }
+
+  /**
+   * Rumbo de la brujula del dispositivo. Solo se aplica cuando el GPS no tiene
+   * nada mejor que decir: en marcha manda el GPS, porque con el movil en un
+   * soporte la orientacion del aparato no es la direccion del coche.
+   */
+  setCompassHeading(deg: number) {
+    this.compassActive = true;
+    if (!compassWins(performance.now(), this.gpsHeadingUntil)) return;
+
+    this.lastHeading = deg;
+    this.marker?.setRotation(deg);
+
+    // La brujula emite hasta 10 veces por segundo. Girar la camara en cada
+    // lectura la dejaria temblando, asi que solo se mueve ante giros de verdad.
+    if (this.following && angleDelta(this.map.getBearing(), deg) > CAMERA_TURN_DEG) {
+      this.map.easeTo({ bearing: deg, duration: 450, essential: true });
     }
   }
 
