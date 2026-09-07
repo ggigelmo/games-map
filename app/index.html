@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>NIGHT CITY</title>
+
+    <!-- viewport-fit=cover: la app pinta por debajo de la muesca del iPhone -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+
+    <!-- PWA / pantalla de inicio de iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NIGHT CITY" />
+    <meta name="theme-color" content="#05060f" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Tipografia del HUD. Nada que ver con los glifos SDF del mapa:
+         el chrome es HTML/CSS, asi que aqui si podemos usar Rajdhani ya. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="scanlines" aria-hidden="true"></div>
+    <div id="ui"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,151 @@
+/* ------------------------------------------------------------------ tokens */
+:root {
+  --bg: #05060f;
+  --cyan: #00f0ff;
+  --cyan-dim: #0a7f8f;
+  --yellow: #fcee0a;
+  --magenta: #ff003c;
+  --ink: #8ceaf5;
+  --panel: rgba(5, 8, 20, 0.82);
+
+  /* Muesca y barra inferior del iPhone */
+  --top: env(safe-area-inset-top, 0px);
+  --bottom: env(safe-area-inset-bottom, 0px);
+  --left: env(safe-area-inset-left, 0px);
+  --right: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Rajdhani, "Segoe UI", system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+#map { position: fixed; inset: 0; }
+
+/* Scanlines: el toque de pantalla CRT. Muy sutil, o marea. */
+#scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 240, 255, 0.045) 0px,
+    rgba(0, 240, 255, 0.045) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: screen;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  padding: calc(var(--top) + 10px) calc(var(--right) + 10px)
+           calc(var(--bottom) + 10px) calc(var(--left) + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#ui > * { pointer-events: auto; }
+
+/* ------------------------------------------------- chrome CP2077 */
+/* Esquinas cortadas en diagonal: la firma visual del juego. */
+.panel {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  clip-path: polygon(
+    10px 0, 100% 0, 100% calc(100% - 10px),
+    calc(100% - 10px) 100%, 0 100%, 0 10px
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.12), inset 0 0 24px rgba(0, 240, 255, 0.05);
+  padding: 8px 12px;
+}
+
+.panel--warn { border-color: rgba(252, 238, 10, 0.5); box-shadow: 0 0 18px rgba(252, 238, 10, 0.15); }
+.panel--bad  { border-color: rgba(255, 0, 60, 0.55);  box-shadow: 0 0 18px rgba(255, 0, 60, 0.18); }
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cyan-dim);
+}
+
+.num {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.55);
+}
+
+/* --------------------------------------------------------- velocimetro */
+.hud-top { display: flex; gap: 10px; align-items: flex-start; }
+
+.speed { min-width: 120px; text-align: center; }
+.speed .num { font-size: 44px; line-height: 1; }
+.speed .unit { font-size: 10px; letter-spacing: 0.3em; color: var(--cyan-dim); }
+
+.readout { display: grid; grid-template-columns: auto auto; gap: 2px 12px; font-size: 12px; }
+.readout .num { font-size: 13px; }
+
+.spacer { flex: 1; }
+
+/* ------------------------------------------------------------ botones */
+.btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: var(--yellow);
+  border: 0;
+  padding: 10px 16px;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  box-shadow: 0 0 20px rgba(252, 238, 10, 0.35);
+  cursor: pointer;
+}
+.btn:active { transform: translateY(1px); }
+.btn--ghost {
+  color: var(--cyan);
+  background: transparent;
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  box-shadow: none;
+}
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ------------------------------------------------------- diagnostico */
+#diag { max-height: 52vh; overflow-y: auto; font-size: 12px; }
+#diag h2 { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--yellow); margin: 0 0 8px; }
+#diag dl { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin: 0; }
+#diag dt { color: var(--cyan-dim); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+#diag dd { margin: 0; font-family: "Share Tech Mono", monospace; font-size: 11px; text-align: right; }
+.ok   { color: #4ee89b; }
+.warn { color: var(--yellow); }
+.bad  { color: var(--magenta); }
+
+/* MapLibre: fuera el chrome por defecto, no encaja */
+.maplibregl-ctrl-attrib {
+  background: rgba(5, 6, 15, 0.7) !important;
+  font-size: 9px !important;
+}
+.maplibregl-ctrl-attrib a { color: var(--cyan-dim) !important; }
+.maplibregl-ctrl-logo { display: none !important; }

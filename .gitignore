@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.expo/
+android/
+ios/
+*.log
+.env
+.env.local
+.DS_Store
+assets/glyphs/*/
