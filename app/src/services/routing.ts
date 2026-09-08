@@ -8,8 +8,18 @@ import { stadiaGet } from './stadia';
  */
 export interface Maneuver {
   instruction: string;
+  /**
+   * Tipo de maniobra de Valhalla, un enum numerico: 15 izquierda, 10 derecha,
+   * 9 leve derecha, 16 leve izquierda, 26/27 rotonda, 1 salida, 6 destino...
+   * Se usa para elegir la flecha.
+   */
+  type: number;
+  /** Calle(s) hacia las que gira. Puede venir vacio en enlaces y rotondas. */
+  streetNames: string[];
   /** Redactada para sintesis de voz, o undefined si Valhalla no la dio */
   verbal: string | undefined;
+  /** Aviso anticipado, mas corto. Lo usara la fase 3b. */
+  verbalAlert: string | undefined;
   /** indice dentro de `coordinates` donde empieza la maniobra */
   beginIndex: number;
   lengthKm: number;
@@ -33,7 +43,10 @@ interface ValhallaResponse {
       shape: string;
       maneuvers: {
         instruction?: string;
+        type?: number;
+        street_names?: string[];
         verbal_pre_transition_instruction?: string;
+        verbal_transition_alert_instruction?: string;
         begin_shape_index: number;
         length: number;
         time: number;
@@ -125,7 +138,10 @@ export async function route(from: Point, to: Point, signal?: AbortSignal): Promi
     for (const m of leg.maneuvers) {
       maneuvers.push({
         instruction: m.instruction ?? '',
+        type: m.type ?? 0,
+        streetNames: m.street_names ?? [],
         verbal: m.verbal_pre_transition_instruction,
+        verbalAlert: m.verbal_transition_alert_instruction,
         beginIndex: offset + m.begin_shape_index,
         lengthKm: m.length,
         timeS: m.time,

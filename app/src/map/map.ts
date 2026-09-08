@@ -15,6 +15,20 @@ import type { Fix } from '../services/geolocation';
  */
 const PAN_INTENT_PX = 32;
 
+/** Zoom fijo mientras navegas: ni se acerca ni se aleja segun el viaje. */
+const NAV_ZOOM = 17;
+
+/** Inclinacion en navegacion: mirar hacia delante, no en planta. */
+const NAV_PITCH = 60;
+
+/**
+ * Que fraccion del alto de pantalla se baja tu marcador respecto al centro.
+ *
+ * Centrado desperdicias media pantalla mirando por donde ya has pasado. Todos
+ * los navegadores te ponen en el tercio inferior por esto.
+ */
+const NAV_OFFSET_RATIO = 0.22;
+
 /** Grados minimos para molestarse en girar la camara con la brujula. */
 const CAMERA_TURN_DEG = 4;
 
@@ -53,6 +67,7 @@ export class MapView {
   /** Hasta cuando el rumbo del GPS tiene prioridad sobre la brujula. */
   private gpsHeadingUntil = 0;
   private compassActive = false;
+  private navMode = false;
 
   /**
    * Avisa de los cambios de `following` para que la UI pueda reflejarlos.
@@ -169,6 +184,9 @@ export class MapView {
         // En una app de navegacion el movimiento de camara no es decorativo:
         // sin esto, "Reducir movimiento" de iOS lo descartaria.
         essential: true,
+        ...(this.navMode
+          ? { zoom: NAV_ZOOM, pitch: NAV_PITCH, offset: this.navOffset() }
+          : {}),
       });
     }
   }
@@ -199,11 +217,44 @@ export class MapView {
       this.map.easeTo({
         center: ll,
         bearing: this.lastHeading,
-        zoom: 16.5,
+        zoom: this.navMode ? NAV_ZOOM : 16.5,
         duration: 600,
         essential: true,
+        ...(this.navMode ? { pitch: NAV_PITCH, offset: this.navOffset() } : {}),
       });
     }
+  }
+
+  /** Desplaza el centro para dejar tu marcador en el tercio inferior. */
+  private navOffset(): [number, number] {
+    return [0, this.map.getContainer().clientHeight * NAV_OFFSET_RATIO];
+  }
+
+  /**
+   * Entra en modo navegacion: baja a nivel de calle y se queda ahi.
+   *
+   * Es el arreglo de la queja "cuanto mas lejos esta el destino, menos zoom se
+   * hace". La vista previa (`fitRoute`) y esta son dos camaras distintas a
+   * proposito, porque sirven para dos cosas incompatibles.
+   */
+  startNavigation() {
+    this.navMode = true;
+    this.following = true;
+    const ll = this.marker?.getLngLat();
+    this.map.easeTo({
+      ...(ll ? { center: ll } : {}),
+      zoom: NAV_ZOOM,
+      pitch: NAV_PITCH,
+      bearing: this.lastHeading,
+      offset: this.navOffset(),
+      duration: 900,
+      essential: true,
+    });
+  }
+
+  stopNavigation() {
+    this.navMode = false;
+    this.map.easeTo({ pitch: 55, offset: [0, 0], duration: 500, essential: true });
   }
 
   /**

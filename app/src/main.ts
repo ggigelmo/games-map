@@ -8,8 +8,11 @@ import { Hud } from './hud/hud';
 import { mountDiagnostics } from './diag/probe';
 import { Compass } from './services/compass';
 import { GeoWatcher } from './services/geolocation';
+import { KeepAwake } from './services/keep-awake';
 import { route as calcularRuta } from './services/routing';
 import { StadiaError } from './services/stadia';
+import { ManeuverCard } from './nav/maneuver-card';
+import { NavSession, type NavPhase } from './nav/session';
 import { RouteLayer } from './route/route-layer';
 import { RouteCard } from './route/route-card';
 import { SearchOverlay } from './search/search-overlay';
@@ -35,6 +38,8 @@ const view = new MapView(mapEl, style);
 const hud = new Hud();
 const routeLayer = new RouteLayer(view.map);
 const routeCard = new RouteCard();
+const maneuverCard = new ManeuverCard();
+const nav = new NavSession();
 
 // MapLibre emite los fallos de estilo y de teselas por este evento en vez de
 // lanzarlos, asi que sin esto un estilo invalido se ve como un mapa negro.
@@ -44,11 +49,13 @@ view.map.on('error', (e) => console.error('[map]', e.error?.message ?? e));
 
 const geo = new GeoWatcher();
 const compass = new Compass();
-const diag = mountDiagnostics(geo, compass);
+const keepAwake = new KeepAwake();
+const diag = mountDiagnostics(geo, compass, keepAwake);
 
 geo.onFix((fix) => {
   view.update(fix);
   hud.update(fix);
+  nav.consume(fix);
 });
 
 // El mapa decide si hace caso: en marcha manda el GPS, parado manda la brujula.
@@ -61,11 +68,18 @@ geo.start();
 // eso esta el boton del panel DIAG.
 if (compass.supported && !compass.needsPermission) void compass.enable();
 
+// La pantalla, encendida mientras la app este en primer plano. Se reintenta al
+// pulsar IR: por ser un gesto real del usuario, es cuando iOS es mas propenso a
+// concederlo, asi que si este primer intento falla habra otra oportunidad justo
+// cuando de verdad hace falta.
+void keepAwake.enable();
+
 if (import.meta.env.DEV) {
   Object.assign(window as unknown as Record<string, unknown>, {
     __map: view.map,
     __view: view,
     __geo: geo,
+    __nav: nav,
     __style: style,
   });
 }
@@ -92,6 +106,9 @@ search.onPick = async (place) => {
     const ruta = await calcularRuta(desde, place, ctrl.signal);
     if (ctrl.signal.aborted) return;
     routeLayer.show(ruta);
+    // Vista previa: se encuadra el viaje entero para poder decidir. La camara
+    // de conducir es otra, y entra al pulsar IR.
+    nav.preview(ruta, place.label);
     routeCard.show(place.label, ruta);
     view.fitRoute(ruta.bounds);
   } catch (err) {
@@ -103,10 +120,35 @@ search.onPick = async (place) => {
   }
 };
 
+routeCard.onGo = () => {
+  nav.start();
+  view.startNavigation();
+  // Segundo intento del bloqueo de pantalla, desde un gesto real.
+  void keepAwake.enable();
+};
+
 routeCard.onClear = () => {
   enCurso?.abort();
-  routeLayer.clear();
-  routeCard.hide();
+  nav.stop();
+};
+
+nav.onUpdate = ({ progress, offRoute }) => {
+  if (offRoute) {
+    maneuverCard.showOffRoute(progress.remainingM, progress.remainingS);
+  } else {
+    maneuverCard.show(
+      progress.next,
+      progress.distanceToNextM,
+      progress.remainingM,
+      progress.remainingS,
+    );
+  }
+};
+
+nav.onArrived = () => {
+  // `stop()` ya ha limpiado la interfaz; esto se queda un rato por encima.
+  maneuverCard.showArrived();
+  window.setTimeout(() => maneuverCard.hide(), 8_000);
 };
 
 // ------------------------------------------------------------------- UI
@@ -131,6 +173,9 @@ geo.onFix(() => {
   searchBtn.disabled = false;
 });
 
+const stopBtn = button('Parar', false, () => nav.stop());
+stopBtn.classList.add('btn--stop');
+
 const recenterBtn = button('Recentrar', true, () => view.recenter());
 
 // Este boton es el UNICO indicador de si la camara te sigue: apagado
@@ -143,7 +188,7 @@ const paintFollowState = (following: boolean) =>
 view.onFollowingChange = paintFollowState;
 paintFollowState(view.following);
 
-button('2D / 3D', true, () => view.togglePitch());
+const pitchBtn = button('2D / 3D', true, () => view.togglePitch());
 
 diag.el.hidden = true;
 const diagBtn = button('Diag', true, () => {
@@ -154,30 +199,41 @@ const diagBtn = button('Diag', true, () => {
 const spacer = document.createElement('div');
 spacer.className = 'spacer';
 
-ui.append(hud.el, spacer, diag.el, routeCard.el, controls);
+ui.append(hud.el, spacer, diag.el, maneuverCard.el, routeCard.el, controls);
 
-// ------------------------------------------------------------ wake lock
+// --------------------------------------------------- maquina de estados
 //
-// El sistema suelta el bloqueo cuando la pagina pasa a segundo plano, asi que
-// hay que volver a pedirlo al regresar. Sin esto la pantalla se apaga en el coche.
+// Cada fase decide que se ve. Tenerlo en un solo sitio evita que la interfaz
+// quede en estados imposibles, como PARAR visible sin ruta.
 
-type WakeLockNavigator = Navigator & {
-  wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> };
-};
+let fasePrevia: NavPhase = 'idle';
 
-async function holdScreenAwake() {
-  const wl = (navigator as WakeLockNavigator).wakeLock;
-  if (!wl) return;
-  try {
-    await wl.request('screen');
-  } catch {
-    // Sin wake lock la app sigue funcionando; solo se apaga la pantalla.
+function paintPhase(phase: NavPhase) {
+  const navegando = phase === 'navigating';
+
+  searchBtn.hidden = navegando;
+  stopBtn.hidden = !navegando;
+  pitchBtn.hidden = navegando; // en navegacion la camara la manda la sesion
+
+  if (phase === 'idle') {
+    routeLayer.clear();
+    routeCard.hide();
+    maneuverCard.hide();
+    // Solo al SALIR de navegacion, para no animar la camara al arrancar la app.
+    if (fasePrevia === 'navigating') view.stopNavigation();
+  } else if (phase === 'preview') {
+    maneuverCard.hide();
+  } else {
+    routeCard.hide();
+    // Hasta la primera lectura no hay progreso que ensenar.
+    maneuverCard.showWaiting();
   }
+
+  fasePrevia = phase;
 }
-void holdScreenAwake();
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') void holdScreenAwake();
-});
+
+nav.onPhase = paintPhase;
+paintPhase('idle');
 
 // --------------------------------------------------- modo laboratorio
 //

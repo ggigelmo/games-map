@@ -15,6 +15,7 @@
  */
 
 import type { Compass } from '../services/compass';
+import type { KeepAwake, KeepAwakeMethod } from '../services/keep-awake';
 import type { GeoWatcher } from '../services/geolocation';
 
 type Verdict = 'ok' | 'warn' | 'bad' | 'pending';
@@ -33,8 +34,13 @@ export interface Diagnostics {
  * @param geo     dueno del watchPosition; este panel solo mide lo que sale de el
  * @param compass brujula; el permiso se concede desde aqui, porque iOS exige
  *                que la peticion salga de un gesto del usuario
+ * @param awake   bloqueo de pantalla; este panel solo informa de que via usa
  */
-export function mountDiagnostics(geo: GeoWatcher, compass: Compass): Diagnostics {
+export function mountDiagnostics(
+  geo: GeoWatcher,
+  compass: Compass,
+  awake: KeepAwake,
+): Diagnostics {
   const el = document.createElement('section');
   el.className = 'panel';
   el.id = 'diag';
@@ -160,21 +166,23 @@ export function mountDiagnostics(geo: GeoWatcher, compass: Compass): Diagnostics
     if (f.kind === 'silent') set('acc', 'Precision', 'permiso nunca resuelto', 'bad');
   });
 
-  // -------------------------------------------------------- wake lock
+  // -------------------------------------------------- pantalla encendida
+  //
+  // Este panel ya NO pide el bloqueo: lo posee services/keep-awake.ts. Antes lo
+  // pedia por su cuenta, compitiendo con el de main.ts por el mismo recurso.
+  // Aqui solo se informa de que via esta funcionando, que es el dato que
+  // faltaba para poder diagnosticarlo sin adivinar.
 
-  type WakeLockNavigator = Navigator & {
-    wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> };
-  };
-  const wl = (navigator as WakeLockNavigator).wakeLock;
+  const pintarAwake = (m: KeepAwakeMethod) =>
+    set(
+      'wake',
+      'Pantalla encendida',
+      m === 'API' ? 'API NATIVA' : m === 'VIDEO' ? 'VIDEO (respaldo)' : 'NO ACTIVA',
+      m === 'NINGUNO' ? 'bad' : 'ok',
+    );
 
-  if (!wl) {
-    set('wake', 'Wake Lock', 'NO SOPORTADO', 'bad');
-  } else {
-    set('wake', 'Wake Lock', 'solicitando...', 'pending');
-    wl.request('screen')
-      .then(() => set('wake', 'Wake Lock', 'ACTIVO', 'ok'))
-      .catch((e: Error) => set('wake', 'Wake Lock', `FALLO: ${e.name}`, 'bad'));
-  }
+  pintarAwake(awake.method);
+  awake.onChange = pintarAwake;
 
   // ------------------------------------------------------------- voz
 

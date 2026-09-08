@@ -255,3 +255,74 @@ html, body {
 .search__dist { flex: none; font-size: 12px; color: var(--cyan-dim); white-space: nowrap; }
 
 .btn:disabled { opacity: 0.35; cursor: default; }
+
+/* -------------------------------------------------- tarjeta de maniobra */
+.mv { display: flex; flex-direction: column; gap: 8px; }
+.mv__top { display: flex; align-items: center; gap: 14px; }
+.mv__arrowbox { flex: none; display: grid; place-items: center; }
+
+.mv__arrow {
+  width: 54px;
+  height: 54px;
+  color: var(--yellow);
+  /* Los trazos son stroke y las puntas de flecha fill, todo con currentColor,
+     asi que basta cambiar `color` para recolorear la flecha entera. */
+  stroke: currentColor;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  /* text-shadow no afecta a SVG; el halo se hace con drop-shadow. */
+  filter: drop-shadow(0 0 8px rgba(252, 238, 10, 0.45));
+}
+.mv__arrow .fill { fill: currentColor; stroke: none; }
+.mv__arrow .hole { fill: var(--bg); stroke: none; }
+/* Las flechas de izquierda son las de derecha en espejo. */
+.mv__arrow--flip { transform: scaleX(-1); }
+
+.mv__text { min-width: 0; }
+
+.mv__dist {
+  font-size: 30px;
+  line-height: 1.05;
+  /* "200 m" no debe partirse en dos lineas si la tarjeta se estrecha. */
+  white-space: nowrap;
+  color: var(--yellow);
+  text-shadow: 0 0 12px rgba(252, 238, 10, 0.5);
+}
+
+.mv__street {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv__trip {
+  font-size: 13px;
+  color: var(--cyan-dim);
+  border-top: 1px solid rgba(0, 240, 255, 0.15);
+  padding-top: 6px;
+}
+
+/* Fuera de ruta: el panel ya se pone en rojo; la flecha y los metros con el. */
+.mv.panel--bad .mv__arrow {
+  color: var(--magenta);
+  filter: drop-shadow(0 0 8px rgba(255, 0, 60, 0.5));
+}
+.mv.panel--bad .mv__dist {
+  color: var(--magenta);
+  text-shadow: 0 0 12px rgba(255, 0, 60, 0.5);
+}
+
+/* ----------------------------------------------------- botones de fase */
+.route-card__go { flex: none; }
+
+/* PARAR en magenta: es la unica accion destructiva de la barra. */
+.btn--stop {
+  background: var(--magenta);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(255, 0, 60, 0.4);
+}

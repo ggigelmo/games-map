@@ -5,9 +5,11 @@ import type { Route } from '../services/routing';
 export class RouteCard {
   readonly el = document.createElement('div');
   onClear: (() => void) | null = null;
+  onGo: (() => void) | null = null;
 
   private destino: HTMLElement;
   private cifras: HTMLElement;
+  private goBtn: HTMLElement;
 
   constructor() {
     this.el.className = 'panel route-card';
@@ -18,15 +20,23 @@ export class RouteCard {
         <div class="route-card__dest" data-dest></div>
         <div class="num route-card__figs" data-figs></div>
       </div>
+      <button class="btn route-card__go">Ir</button>
       <button class="route-card__x" aria-label="Borrar ruta">&times;</button>`;
 
     this.destino = this.el.querySelector('[data-dest]')!;
     this.cifras = this.el.querySelector('[data-figs]')!;
+    this.goBtn = this.el.querySelector('.route-card__go')!;
     this.el.querySelector('.route-card__x')!.addEventListener('click', () => this.onClear?.());
+    this.el.querySelector('.route-card__go')!.addEventListener('click', () => this.onGo?.());
   }
 
   show(destino: string, route: Route) {
-    this.paint(destino, `${formatDistance(route.distanceKm * 1000)}  ·  ${formatDuration(route.durationS)}`, false);
+    this.paint(
+      destino,
+      `${formatDistance(route.distanceKm * 1000)}  ·  ${formatDuration(route.durationS)}`,
+      false,
+      true,
+    );
   }
 
   /** Mientras Valhalla responde. Sin esto no hay senal de que algo pasa. */
@@ -42,10 +52,12 @@ export class RouteCard {
     this.el.hidden = true;
   }
 
-  private paint(destino: string, cifras: string, malo: boolean) {
+  private paint(destino: string, cifras: string, malo: boolean, puedeIr = false) {
     this.destino.textContent = destino;
     this.cifras.textContent = cifras;
     this.el.classList.toggle('panel--bad', malo);
+    // IR solo aparece con una ruta ya calculada: no mientras se pide, ni si fallo.
+    this.goBtn.hidden = !puedeIr;
     this.el.hidden = false;
   }
 }
