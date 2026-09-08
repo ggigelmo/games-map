@@ -174,6 +174,20 @@ export class ManeuverCard {
     this.el.hidden = false;
   }
 
+  /**
+   * Recalculando tras un desvio. Se distingue de FUERA DE RUTA a proposito: la
+   * app esta haciendo algo, y decir solo "fuera de ruta" pareceria que se ha
+   * rendido.
+   */
+  showRerouting(remainingM: number, remainingS: number) {
+    this.el.classList.add('panel--bad');
+    this.arrow.innerHTML = arrowSvg(0);
+    this.dist.textContent = 'Recalculando';
+    this.street.textContent = 'Buscando otra ruta';
+    this.trip.textContent = `${formatDistance(remainingM)}  ·  ${formatDuration(remainingS)}`;
+    this.el.hidden = false;
+  }
+
   /** Mientras no hay lectura de GPS todavia. */
   showWaiting() {
     this.el.classList.remove('panel--bad');

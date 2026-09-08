@@ -5,6 +5,7 @@
  *   idle ──(elige destino)──▶ preview ──(IR)──▶ navigating ──(PARAR)──▶ idle
  *                                └──────────(X)──────────────────────────┘
  */
+import type { Point } from '../services/geo-math';
 import type { Fix } from '../services/geolocation';
 import type { Route } from '../services/routing';
 import { initialOffRoute, updateOffRoute, type OffRouteState } from './off-route';
@@ -17,10 +18,26 @@ export interface NavUpdate {
   progress: Progress;
   snapped: Snapped;
   offRoute: boolean;
+  /** Hay un recalculo en vuelo. */
+  rerouting: boolean;
+}
+
+/** A donde vas: hace falta la posicion, no solo el nombre, para recalcular. */
+export interface Destination extends Point {
+  label: string;
 }
 
 /** Metros al destino por debajo de los cuales se considera que has llegado. */
 const ARRIVAL_M = 40;
+
+/**
+ * Minimo entre recalculos.
+ *
+ * Sin este freno, un desvio persistente (una calle mal cartografiada, un atajo
+ * deliberado) pediria una ruta nueva en cada lectura del GPS: varias por
+ * segundo contra la API, y la tarjeta parpadeando sin parar.
+ */
+const MIN_REROUTE_MS = 15_000;
 
 export class NavSession {
   private _phase: NavPhase = 'idle';
@@ -28,12 +45,35 @@ export class NavSession {
   private cumulative: number[] = [];
   private lastIndex = 0;
   private off: OffRouteState = initialOffRoute;
-
-  destination = '';
+  private _destination: Destination | null = null;
+  private _rerouting = false;
+  /**
+   * -Infinity, no 0: cero es una marca de tiempo LEGITIMA (la que devuelve
+   * performance.now() recien arrancado), asi que usarlo de centinela de "nunca"
+   * anulaba el freno entre recalculos. Lo cazo un test con reloj falso.
+   */
+  private lastRerouteAt = -Infinity;
 
   onPhase: ((phase: NavPhase) => void) | null = null;
   onUpdate: ((update: NavUpdate) => void) | null = null;
   onArrived: (() => void) | null = null;
+
+  /**
+   * Hace falta una ruta nueva desde `from`. Quien escucha hace la peticion y
+   * responde con `replaceRoute()` o `rerouteFailed()`.
+   *
+   * La sesion no habla con la red a proposito: asi no depende de HTTP y se
+   * puede probar entera con lecturas sinteticas.
+   */
+  onNeedsReroute: ((from: Fix, to: Destination) => void) | null = null;
+
+  get destination(): Destination | null {
+    return this._destination;
+  }
+
+  get rerouting(): boolean {
+    return this._rerouting;
+  }
 
   get phase(): NavPhase {
     return this._phase;
@@ -44,14 +84,34 @@ export class NavSession {
   }
 
   /** Ruta calculada: pasa a vista previa, sin empezar a navegar. */
-  preview(route: Route, destination: string) {
+  preview(route: Route, destination: Destination) {
+    this._destination = destination;
+    this.adopt(route);
+    this.setPhase('preview');
+  }
+
+  /**
+   * Ruta nueva tras un desvio. No cambia de fase: sigues navegando, solo por
+   * otro camino.
+   */
+  replaceRoute(route: Route) {
+    if (this._phase !== 'navigating') return;
+    this._rerouting = false;
+    this.adopt(route);
+  }
+
+  /** El recalculo no salio. Se reintentara pasado el intervalo minimo. */
+  rerouteFailed() {
+    this._rerouting = false;
+  }
+
+  /** Estado derivado de una ruta, se estrene o se sustituya. */
+  private adopt(route: Route) {
     this._route = route;
-    this.destination = destination;
     // Se calcula una vez por ruta, no en cada lectura del GPS.
     this.cumulative = cumulativeMeters(route.coordinates);
     this.lastIndex = 0;
     this.off = initialOffRoute;
-    this.setPhase('preview');
   }
 
   /** El usuario ha pulsado IR. */
@@ -64,9 +124,11 @@ export class NavSession {
   stop() {
     this._route = null;
     this.cumulative = [];
-    this.destination = '';
+    this._destination = null;
     this.lastIndex = 0;
     this.off = initialOffRoute;
+    this._rerouting = false;
+    this.lastRerouteAt = -Infinity;
     this.setPhase('idle');
   }
 
@@ -83,7 +145,14 @@ export class NavSession {
     this.off = updateOffRoute(this.off, snapped.distanceM, fix.accuracy);
     const progress = computeProgress(snapped, this._route, this.cumulative);
 
-    this.onUpdate?.({ progress, snapped, offRoute: this.off.off });
+    if (this.off.off) this.maybeReroute(fix);
+
+    this.onUpdate?.({
+      progress,
+      snapped,
+      offRoute: this.off.off,
+      rerouting: this._rerouting,
+    });
 
     // Llegar solo cuenta si de verdad estas sobre la ruta: fuera de ella, la
     // distancia restante no significa nada.
@@ -93,6 +162,18 @@ export class NavSession {
       this.stop();
       this.onArrived?.();
     }
+  }
+
+  /** Pide ruta nueva si toca: fuera de ruta, sin otra en vuelo, y sin prisa. */
+  private maybeReroute(fix: Fix) {
+    if (this._rerouting || !this._destination || !this.onNeedsReroute) return;
+
+    const now = performance.now();
+    if (now - this.lastRerouteAt < MIN_REROUTE_MS) return;
+
+    this.lastRerouteAt = now;
+    this._rerouting = true;
+    this.onNeedsReroute(fix, this._destination);
   }
 
   private setPhase(phase: NavPhase) {

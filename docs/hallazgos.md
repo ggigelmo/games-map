@@ -192,3 +192,27 @@ veces por segundo y girar la camara en cada uno la deja temblando.
 La regla de quien manda (GPS en marcha, brujula parado) vive en
 `app/src/services/heading.ts` como logica pura y con tests, porque comprobarla
 de verdad exigiria moverse y girar un movil.
+
+## 11. Usar `0` como centinela de "nunca" choca con un tiempo legitimo
+
+El freno entre recalculos guardaba en `lastRerouteAt` el instante del ultimo
+intento, y usaba `0` para decir "todavia ninguno":
+
+```ts
+if (this.lastRerouteAt !== 0 && now - this.lastRerouteAt < MIN_REROUTE_MS) return;
+```
+
+Pero **cero es una marca de tiempo perfectamente valida**: es justo lo que
+devuelve `performance.now()` recien arrancado. Cuando el primer recalculo caia
+en ese instante, la condicion lo leia como "nunca he recalculado" y el freno
+dejaba de existir: una peticion a la API por cada lectura del GPS.
+
+Se manifesto con relojes falsos en un test, que empiezan en 0 por definicion, y
+en produccion habria aparecido solo de vez en cuando, en la primera ruta de la
+sesion. La solucion es que el valor "nunca" no pueda confundirse con un tiempo:
+
+```ts
+private lastRerouteAt = -Infinity;
+// y la condicion se queda en una sola comparacion
+if (now - this.lastRerouteAt < MIN_REROUTE_MS) return;
+```

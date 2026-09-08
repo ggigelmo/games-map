@@ -7,12 +7,12 @@ import { MapView } from './map/map';
 import { Hud } from './hud/hud';
 import { mountDiagnostics } from './diag/probe';
 import { Compass } from './services/compass';
-import { GeoWatcher } from './services/geolocation';
+import { GeoWatcher, type Fix } from './services/geolocation';
 import { KeepAwake } from './services/keep-awake';
 import { route as calcularRuta } from './services/routing';
 import { StadiaError } from './services/stadia';
 import { ManeuverCard } from './nav/maneuver-card';
-import { NavSession, type NavPhase } from './nav/session';
+import { NavSession, type Destination, type NavPhase } from './nav/session';
 import { RouteLayer } from './route/route-layer';
 import { RouteCard } from './route/route-card';
 import { SearchOverlay } from './search/search-overlay';
@@ -91,6 +91,8 @@ const search = new SearchOverlay(() => geo.last);
 document.body.appendChild(search.el);
 
 let enCurso: AbortController | null = null;
+/** Peticion de recalculo en vuelo. Declarada aqui porque onClear la usa. */
+let reruta: AbortController | null = null;
 
 search.onPick = async (place) => {
   const desde = geo.last;
@@ -108,7 +110,7 @@ search.onPick = async (place) => {
     routeLayer.show(ruta);
     // Vista previa: se encuadra el viaje entero para poder decidir. La camara
     // de conducir es otra, y entra al pulsar IR.
-    nav.preview(ruta, place.label);
+    nav.preview(ruta, { label: place.label, lng: place.lng, lat: place.lat });
     routeCard.show(place.label, ruta);
     view.fitRoute(ruta.bounds);
   } catch (err) {
@@ -129,11 +131,37 @@ routeCard.onGo = () => {
 
 routeCard.onClear = () => {
   enCurso?.abort();
+  reruta?.abort();
   nav.stop();
 };
 
-nav.onUpdate = ({ progress, offRoute }) => {
-  if (offRoute) {
+/**
+ * Recalculo automatico. La sesion decide CUANDO hace falta (fuera de ruta, sin
+ * otra peticion en vuelo, y con 15 s minimo entre intentos); aqui solo se pide
+ * la ruta, que es donde ya vive el trato con la red.
+ */
+nav.onNeedsReroute = async (from: Fix, to: Destination) => {
+  reruta?.abort();
+  const ctrl = new AbortController();
+  reruta = ctrl;
+
+  try {
+    const nueva = await calcularRuta(from, to, ctrl.signal);
+    if (ctrl.signal.aborted) return;
+    routeLayer.show(nueva);
+    nav.replaceRoute(nueva);
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return;
+    // Sin cobertura la ruta vieja sigue dibujada y la tarjeta vuelve a FUERA DE
+    // RUTA. La sesion reintentara pasado el intervalo.
+    nav.rerouteFailed();
+  }
+};
+
+nav.onUpdate = ({ progress, offRoute, rerouting }) => {
+  if (rerouting) {
+    maneuverCard.showRerouting(progress.remainingM, progress.remainingS);
+  } else if (offRoute) {
     maneuverCard.showOffRoute(progress.remainingM, progress.remainingS);
   } else {
     maneuverCard.show(
