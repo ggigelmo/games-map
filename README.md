@@ -1,6 +1,6 @@
-# Night City Maps
+# Cyberpunk Maps
 
-Navegador GPS con la estética de Cyberpunk 2077.
+Navegador GPS con la estética Cyberpunk.
 
 Es una **PWA**: se despliega como web y se añade a la pantalla de inicio del
 iPhone, donde arranca a pantalla completa sin barra de Safari. Sin App Store,
