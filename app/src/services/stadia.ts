@@ -50,10 +50,14 @@ export async function stadiaGet<T>(
     const res = await fetch(url, { signal: merged });
     if (!res.ok) {
       // A 401/403 here almost always means the domain isn't registered yet.
+      // A 429 means the free tier's shared quota ran out for this stretch:
+      // expected on a demo with no per-user key, not a bug to chase.
       const hint =
         res.status === 401 || res.status === 403
           ? 'Domain not authorized with Stadia Maps'
-          : `Error ${res.status}`;
+          : res.status === 429
+            ? 'Demo search limit reached for now, try again later'
+            : `Error ${res.status}`;
       throw new StadiaError(hint, res.status);
     }
     return (await res.json()) as T;

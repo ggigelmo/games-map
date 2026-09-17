@@ -205,6 +205,11 @@ Configuration*:
 Worth keeping in mind: if `Referrer-Policy: no-referrer` is ever set on the
 site, authentication stops working.
 
+**Known limitation:** since there's no per-user key, search and routing share
+one free-tier quota across every visitor to the live demo. If it runs out for
+the month, the search box shows "demo search limit reached for now, try again
+later" instead of results — that's the quota talking, not a bug.
+
 Valhalla returns instructions **already drafted in whatever language is
 requested**, including three variants meant to be read aloud. That's what
 made adding voice easy.
