@@ -1,13 +1,13 @@
 /**
- * Genera style/cyberpunk.json a partir de una paleta y una tabla de clases.
+ * Generates style/cyberpunk.json from a palette and a class table.
  *
- * El neon se consigue apilando tres capas de linea por cada clase de carretera:
- *   glow  -> ancha, muy difuminada (line-blur), opacidad baja, color saturado
- *   mid   -> intermedia, algo de blur, color saturado
- *   core  -> fina, sin blur, color aclarado casi blanco = el filamento caliente
+ * The neon look comes from stacking three line layers per road class:
+ *   glow  -> wide, heavily blurred (line-blur), low opacity, saturated color
+ *   mid   -> intermediate, some blur, saturated color
+ *   core  -> thin, no blur, near-white lightened color = the hot filament
  *
- * Ese "halo de color + nucleo blanco" es lo que hace que se lea como neon y no
- * como una raya de color. Cambiar la paleta y volver a ejecutar:
+ * That "color halo + white core" is what reads as neon instead of a plain
+ * colored stripe. Change the palette and rerun:
  *   node style/build.mjs
  */
 import { writeFileSync } from 'node:fs';
@@ -18,7 +18,7 @@ import { CLASS_TO_ICON, FALLBACK_ICON, spriteName } from '../assets/lib/poi-icon
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'cyberpunk.json');
 
-// ---------------------------------------------------------------- paleta
+// ---------------------------------------------------------------- palette
 
 const P = {
   bg: '#05060f',
@@ -39,7 +39,7 @@ const P = {
   halo: '#03040a',
 };
 
-/** Aclara un hex hacia blanco. amount 0..1 */
+/** Lightens a hex color toward white. amount 0..1 */
 const lighten = (hex, amount) => {
   const n = parseInt(hex.slice(1), 16);
   const ch = [n >> 16, (n >> 8) & 255, n & 255].map((c) =>
@@ -48,18 +48,20 @@ const lighten = (hex, amount) => {
   return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('');
 };
 
-// ------------------------------------------------- tabla de carreteras
+// ------------------------------------------------- road table
 //
-// w: pares [zoom, ancho_px] del nucleo. glow y mid se derivan multiplicando.
-// Sin esto todo el mapa se ve mal a cualquier zoom que no sea el que mirabas.
+// w: [zoom, core_width_px] pairs. glow and mid are derived by multiplying.
+// Without this, the whole map looks wrong at any zoom other than the one
+// you were staring at.
 
-// coreLighten: cuanto se aclara el nucleo respecto al color del halo. Alto =
-// filamento blanco. Ojo: pasarse de 0.4 mata el color y todo se vuelve blanco,
-// que fue el primer error de tuneo: parecia un mapa normal con calles claras.
+// coreLighten: how much the core is lightened relative to the halo color.
+// High = white filament. Watch out: going past 0.4 kills the color and
+// everything turns white, which was the first tuning mistake — it looked
+// like a normal map with light-colored streets.
 const ROADS = [
   {
-    // Son el 80% de las lineas del mapa. Si no retroceden, dominan la imagen
-    // y el neon de las vias importantes no se ve.
+    // These are 80% of the map's lines. If they don't recede, they dominate
+    // the image and the neon on the important roads doesn't show.
     key: 'minor',
     classes: ['minor', 'service', 'track'],
     minzoom: 12,
@@ -100,7 +102,7 @@ const ROADS = [
     classes: ['motorway', 'trunk'],
     minzoom: 5,
     color: '#fcee0a',
-    // Bajo, para que el nucleo siga leyendose AMARILLO y no blanco.
+    // Low, so the core still reads as YELLOW and not white.
     coreLighten: 0.22,
     w: [[5, 0.6], [9, 1.3], [12, 2.5], [14, 4], [16, 7], [18, 14], [20, 32]],
     glow: { mul: 5.5, opacity: 0.45 },
@@ -109,7 +111,7 @@ const ROADS = [
 
 // ------------------------------------------------------------- helpers
 
-/** [[z,v],...] -> expresion interpolate exponencial sobre el zoom */
+/** [[z,v],...] -> exponential interpolate expression over zoom */
 const zoomW = (stops, mul = 1) => [
   'interpolate',
   ['exponential', 1.5],
@@ -126,7 +128,7 @@ const roadFilter = (classes, extra = []) => [
   ...extra,
 ];
 
-/** Los tres estratos de una clase de carretera. */
+/** The three strata of a road class. */
 function neonRoad(r, stratum) {
   const base = {
     id: `road-${r.key}-${stratum}`,
@@ -171,11 +173,11 @@ function neonRoad(r, stratum) {
 }
 
 /**
- * icon-image: elige el icono segun el tipo de establecimiento.
+ * icon-image: picks the icon based on business type.
  *
- * Se agrupan las clases por icono para que salga una expresion compacta
- * (15 ramas en vez de 130) y para que la tabla de assets/lib/poi-icons.mjs
- * siga siendo el unico sitio donde se decide que icono lleva cada negocio.
+ * Classes are grouped by icon so the expression comes out compact (15
+ * branches instead of 130) and so the table in assets/lib/poi-icons.mjs
+ * stays the single place where it's decided which icon each business gets.
  */
 const iconExpr = (() => {
   const byIcon = new Map();
@@ -197,16 +199,16 @@ const fillPoly = (id, sourceLayer, color, opacity, extra = {}) => ({
   ...extra,
 });
 
-// -------------------------------------------------------------- capas
+// -------------------------------------------------------------- layers
 //
-// El ORDEN es lo que produce el efecto. Todos los glow van abajo para que se
-// mezclen entre si; todos los core van arriba para que ninguno quede apagado
-// por el halo de una carretera mas importante.
+// The ORDER is what produces the effect. All the glows go at the bottom so
+// they blend with each other; all the cores go on top so none of them get
+// dimmed by a halo from a more important road.
 
 const layers = [
   { id: 'background', type: 'background', paint: { 'background-color': P.bg } },
 
-  // --- suelo: distritos apenas insinuados, con tinte por uso
+  // --- ground: districts barely hinted at, tinted by land use
   fillPoly('landuse-industrial', 'landuse', P.industrial, 0.55, {
     filter: ['match', ['get', 'class'], ['industrial', 'railway'], true, false],
     minzoom: 10,
@@ -220,7 +222,7 @@ const layers = [
   }),
   fillPoly('park', 'park', P.park, 0.45, { minzoom: 8 }),
 
-  // --- agua: negra con el borde encendido
+  // --- water: black with a glowing edge
   fillPoly('water', 'water', P.water, 1, {
     filter: ['!=', ['get', 'brunnel'], 'tunnel'],
   }),
@@ -262,7 +264,7 @@ const layers = [
     },
   },
 
-  // --- tuneles: mismas vias, apagadas y punteadas
+  // --- tunnels: same roads, dimmed and dashed
   {
     id: 'road-tunnel',
     type: 'line',
@@ -282,7 +284,7 @@ const layers = [
     },
   },
 
-  // --- ferrocarril
+  // --- railway
   {
     id: 'rail',
     type: 'line',
@@ -298,12 +300,12 @@ const layers = [
     },
   },
 
-  // --- carreteras: 5 clases x 3 estratos, agrupados por estrato
+  // --- roads: 5 classes x 3 strata, grouped by stratum
   ...ROADS.map((r) => neonRoad(r, 'glow')),
   ...ROADS.map((r) => neonRoad(r, 'mid')),
   ...ROADS.map((r) => neonRoad(r, 'core')),
 
-  // --- edificios: mas altos = mas cian. Es lo que da la silueta de Night City.
+  // --- buildings: taller = more cyan. This is what gives Night City its silhouette.
   {
     id: 'building-3d',
     type: 'fill-extrusion',
@@ -337,7 +339,7 @@ const layers = [
     },
   },
 
-  // --- fronteras administrativas
+  // --- administrative boundaries
   {
     id: 'boundary',
     type: 'line',
@@ -352,7 +354,7 @@ const layers = [
     },
   },
 
-  // --- etiquetas. Mayusculas + letter-spacing = look de HUD.
+  // --- labels. Uppercase + letter-spacing = HUD look.
   {
     id: 'water-label',
     type: 'symbol',
@@ -399,8 +401,8 @@ const layers = [
     },
   },
   {
-    // Icono y etiqueta en la MISMA capa: asi colisionan como una unidad y no
-    // se queda un nombre huerfano lejos de su icono.
+    // Icon and label in the SAME layer: this way they collide as one unit
+    // and a name never ends up orphaned away from its icon.
     id: 'poi',
     type: 'symbol',
     source: 'openmaptiles',
@@ -409,8 +411,8 @@ const layers = [
     filter: [
       'all',
       ['match', ['geometry-type'], ['Point', 'MultiPoint'], true, false],
-      // Revelado progresivo: primero los sitios importantes, y al acercarte,
-      // todo. rank bajo = mas relevante; sin rank se deja para el final.
+      // Progressive reveal: important places first, and everything once you
+      // zoom in. Low rank = more relevant; no rank gets left for last.
       [
         '<=',
         ['coalesce', ['get', 'rank'], 99],
@@ -422,7 +424,7 @@ const layers = [
       'icon-size': zoomW([[14, 0.42], [16, 0.6], [18, 0.78], [20, 0.9]]),
       'icon-allow-overlap': false,
       'icon-padding': 2,
-      // Los mas relevantes ganan el sitio cuando dos iconos se pisan.
+      // The most relevant ones win the spot when two icons overlap.
       'symbol-sort-key': ['coalesce', ['get', 'rank'], 99],
       'text-field': ['coalesce', ['get', 'name:latin'], ['get', 'name']],
       'text-font': ['Noto Sans Regular'],
@@ -432,7 +434,7 @@ const layers = [
       'text-anchor': 'top',
       'text-offset': [0, 1.15],
       'text-max-width': 9,
-      // Si el nombre no cabe, se pierde el nombre pero se conserva el icono.
+      // If the name doesn't fit, the name is dropped but the icon stays.
       'text-optional': true,
     },
     paint: {
@@ -510,33 +512,33 @@ const layers = [
   },
 ];
 
-// -------------------------------------------------------------- estilo
+// -------------------------------------------------------------- style
 
 const style = {
   version: 8,
   name: 'Night City',
   metadata: {
     'games-map:generated-by': 'style/build.mjs',
-    'games-map:note': 'No editar a mano. Edita build.mjs y vuelve a ejecutarlo.',
+    'games-map:note': 'Do not edit by hand. Edit build.mjs and rerun it.',
   },
-  // Teselas sin API key, esquema OpenMapTiles: el mismo que sirve Stadia Maps,
-  // asi que cambiar de proveedor es cambiar estas dos URLs.
+  // API-key-free tiles, OpenMapTiles schema: the same one Stadia Maps serves,
+  // so switching providers just means changing these two URLs.
   sources: {
     openmaptiles: { type: 'vector', url: 'https://tiles.openfreemap.org/planet' },
   },
-  // TODO fase 0b: apuntar a glifos SDF propios (Rajdhani / Chakra Petch)
-  // generados con MapLibre Font Maker. OpenFreeMap solo sirve Noto Sans.
+  // TODO phase 0b: point to our own SDF glyphs (Rajdhani / Chakra Petch)
+  // generated with MapLibre Font Maker. OpenFreeMap only serves Noto Sans.
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-  // Sprite propio, generado por assets/make-sprite.mjs. Ruta relativa a la
-  // raiz del sitio, asi vale igual en desarrollo y en Netlify.
+  // Our own sprite, generated by assets/make-sprite.mjs. Path relative to the
+  // site root, so it works the same in development and on Netlify.
   sprite: '/sprites/night-city',
-  // NO colorear la luz para tenir los edificios: el shader de fill-extrusion
-  // acota el color por abajo con 0.3 * (1 - colorDeLuz), asi que una luz cian
-  // (0,1,1) fuerza el canal ROJO a 0.3 y los edificios salen granate. El tinte
-  // va en fill-extrusion-color; la luz se queda neutra.
+  // Do NOT color the light to tint the buildings: the fill-extrusion shader
+  // clamps color from below with 0.3 * (1 - lightColor), so a cyan light
+  // (0,1,1) forces the RED channel to 0.3 and the buildings come out
+  // maroon. The tint lives in fill-extrusion-color; the light stays neutral.
   light: { anchor: 'viewport', color: '#00f0ff', intensity: 0.18, position: [1.2, 200, 40] },
   layers,
 };
 
 writeFileSync(OUT, JSON.stringify(style, null, 2) + '\n');
-console.log(`ok  ${OUT}  (${layers.length} capas)`);
+console.log(`ok  ${OUT}  (${layers.length} layers)`);

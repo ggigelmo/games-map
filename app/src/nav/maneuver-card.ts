@@ -2,11 +2,11 @@ import { formatDistance, formatDuration } from '../services/geo-math';
 import type { Maneuver } from '../services/routing';
 
 /**
- * Tarjeta del siguiente giro.
+ * Next-turn card.
  *
- * Las flechas se dibujan como SVG en linea, no como sprites: van en el HUD, no
- * en el mapa, asi que no hacen falta glifos SDF ni hojas de sprites. Usan
- * `currentColor`, de modo que el CSS decide el color.
+ * The arrows are drawn as inline SVG, not sprites: they live in the HUD, not
+ * on the map, so no SDF glyphs or sprite sheets are needed. They use
+ * `currentColor`, so CSS decides the color.
  */
 
 type Shape =
@@ -20,22 +20,22 @@ type Shape =
   | 'destination';
 
 /**
- * Punta de flecha canonica: apunta ARRIBA y esta centrada en el origen.
+ * Canonical arrowhead: points UP and is centered on the origin.
  *
- * Se coloca y se gira con un `transform`, en vez de calcular los tres vertices
- * de cada punta con trigonometria. El primer intento fue asi y salieron tres
- * flechas torcidas (giro brusco, rotonda e incorporacion): con la punta
- * canonica, la orientacion es un numero de grados y no puede estar mal.
+ * It's positioned and rotated with a `transform`, instead of computing each
+ * head's three vertices with trigonometry. The first attempt did that and it
+ * produced three crooked arrows (sharp turn, roundabout, and merge): with the
+ * canonical head, orientation is just a number of degrees and can't be wrong.
  */
 const HEAD = 'M0 -7 L5.5 5 L-5.5 5 Z';
 
-/** @param deg 0 arriba, 90 derecha, 180 abajo (sentido horario) */
+/** @param deg 0 up, 90 right, 180 down (clockwise) */
 const head = (x: number, y: number, deg: number) =>
   `<path d="${HEAD}" class="fill" transform="translate(${x} ${y}) rotate(${deg})" />`;
 
 /**
- * Solo se dibuja la variante DERECHA de cada forma. Las de izquierda son la
- * misma con un espejo horizontal: menos trazados y simetria garantizada.
+ * Only the RIGHT variant of each shape is drawn. The left ones are the same
+ * mirrored horizontally: fewer paths and guaranteed symmetry.
  */
 const SHAPES: Record<Shape, string> = {
   straight: `<path d="M16 29V13" />${head(16, 9, 0)}`,
@@ -44,20 +44,20 @@ const SHAPES: Record<Shape, string> = {
 
   turn: `<path d="M12 29V17 Q12 14 15 14 H19" />${head(23, 14, 90)}`,
 
-  // Giro cerrado: la punta mira hacia abajo-derecha, no solo a la derecha.
+  // Sharp turn: the head points down-right, not just right.
   sharp: `<path d="M12 29V19 Q12 15 16 15.5 L18.5 16.5" />${head(22, 20, 135)}`,
 
   uturn: `<path d="M11 29V17 Q11 10 18 10 Q25 10 25 17V19" />${head(25, 23, 180)}`,
 
-  // Entras por abajo, das la vuelta y sales hacia arriba a la derecha. Con la
-  // salida en horizontal se leia como una piruleta, no como una rotonda.
+  // You enter from below, loop around, and exit upward to the right. With the
+  // exit drawn horizontally it read as a lollipop, not a roundabout.
   roundabout:
     `<circle cx="15" cy="14.5" r="6" />` +
     `<path d="M15 29V20.5" />` +
     `<path d="M19.3 10.2 L20.8 8.7" />` +
     head(23, 6.5, 45),
 
-  // Via principal recta y una secundaria que se incorpora desde la derecha.
+  // Straight main road with a secondary one merging in from the right.
   merge: `<path d="M14 29V13" /><path d="M24 27 Q24 19 15.5 16" />${head(14, 9, 0)}`,
 
   destination:
@@ -66,9 +66,9 @@ const SHAPES: Record<Shape, string> = {
 };
 
 /**
- * Tipos de maniobra de Valhalla. Es un enum numerico y no todos merecen una
- * flecha propia: los enlaces y los "mantengase a la derecha" se dibujan como
- * un giro leve, que es lo que significan al volante.
+ * Valhalla maneuver types. It's a numeric enum and not all of them deserve
+ * their own arrow: ramps and "keep right" are drawn as a slight turn, which
+ * is what they mean at the wheel.
  */
 function arrowFor(type: number): { shape: Shape; flip: boolean } {
   switch (type) {
@@ -76,12 +76,12 @@ function arrowFor(type: number): { shape: Shape; flip: boolean } {
     case 5:
     case 6:
       return { shape: 'destination', flip: false };
-    case 9: // leve derecha
-    case 18: // enlace derecha
-    case 20: // salida derecha
-    case 23: // mantengase a la derecha
+    case 9: // slight right
+    case 18: // ramp right
+    case 20: // exit right
+    case 23: // keep right
       return { shape: 'slight', flip: false };
-    case 16: // leve izquierda
+    case 16: // slight left
     case 19:
     case 21:
     case 24:
@@ -103,8 +103,8 @@ function arrowFor(type: number): { shape: Shape; flip: boolean } {
     case 26:
     case 27:
       return { shape: 'roundabout', flip: false };
-    // 1-3 salida, 7-8 continuar, 17 enlace recto, 22 seguir recto, y lo que
-    // no este contemplado: recto es el valor de reserva razonable.
+    // 1-3 exit, 7-8 continue, 17 straight ramp, 22 stay straight, and anything
+    // not covered: straight is the reasonable fallback.
     default:
       return { shape: 'straight', flip: false };
   }
@@ -148,13 +148,13 @@ export class ManeuverCard {
     if (next) {
       this.arrow.innerHTML = arrowSvg(next.type);
       this.dist.textContent = formatDistance(distanceToNextM);
-      // Sin nombre de calle (enlaces, rotondas) se cae a la instruccion entera,
-      // que Valhalla siempre da.
+      // Without a street name (ramps, roundabouts) fall back to the full
+      // instruction, which Valhalla always provides.
       this.street.textContent = next.streetNames[0] ?? next.instruction;
     } else {
       this.arrow.innerHTML = arrowSvg(4);
       this.dist.textContent = formatDistance(remainingM);
-      this.street.textContent = 'Destino';
+      this.street.textContent = 'Destination';
     }
 
     this.trip.textContent = `${formatDistance(remainingM)}  ·  ${formatDuration(remainingS)}`;
@@ -162,37 +162,38 @@ export class ManeuverCard {
   }
 
   /**
-   * Sin recalculo (llega en la fase 3b), lo honesto es decir que no se sabe en
-   * vez de seguir mostrando un giro de una ruta que ya no sigues.
+   * Without a reroute (arrives in phase 3b), the honest thing is to say we
+   * don't know instead of still showing a turn from a route you're no longer
+   * following.
    */
   showOffRoute(remainingM: number, remainingS: number) {
     this.el.classList.add('panel--bad');
     this.arrow.innerHTML = arrowSvg(0);
-    this.dist.textContent = 'Fuera de ruta';
-    this.street.textContent = 'Vuelve a la ruta marcada';
+    this.dist.textContent = 'Off route';
+    this.street.textContent = 'Return to the marked route';
     this.trip.textContent = `${formatDistance(remainingM)}  ·  ${formatDuration(remainingS)}`;
     this.el.hidden = false;
   }
 
   /**
-   * Recalculando tras un desvio. Se distingue de FUERA DE RUTA a proposito: la
-   * app esta haciendo algo, y decir solo "fuera de ruta" pareceria que se ha
-   * rendido.
+   * Recalculating after a deviation. Deliberately distinct from OFF ROUTE:
+   * the app is doing something, and just saying "off route" would make it
+   * seem like it gave up.
    */
   showRerouting(remainingM: number, remainingS: number) {
     this.el.classList.add('panel--bad');
     this.arrow.innerHTML = arrowSvg(0);
-    this.dist.textContent = 'Recalculando';
-    this.street.textContent = 'Buscando otra ruta';
+    this.dist.textContent = 'Recalculating';
+    this.street.textContent = 'Finding another route';
     this.trip.textContent = `${formatDistance(remainingM)}  ·  ${formatDuration(remainingS)}`;
     this.el.hidden = false;
   }
 
-  /** Mientras no hay lectura de GPS todavia. */
+  /** While there's no GPS fix yet. */
   showWaiting() {
     this.el.classList.remove('panel--bad');
     this.arrow.innerHTML = arrowSvg(0);
-    this.dist.textContent = 'Buscando GPS';
+    this.dist.textContent = 'Acquiring GPS';
     this.street.textContent = '';
     this.trip.textContent = '';
     this.el.hidden = false;
@@ -201,7 +202,7 @@ export class ManeuverCard {
   showArrived() {
     this.el.classList.remove('panel--bad');
     this.arrow.innerHTML = arrowSvg(4);
-    this.dist.textContent = 'Has llegado';
+    this.dist.textContent = 'You have arrived';
     this.street.textContent = '';
     this.trip.textContent = '';
     this.el.hidden = false;

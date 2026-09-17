@@ -1,33 +1,35 @@
 /**
- * De donde sale el rumbo del mapa: del GPS o de la brujula.
+ * Where the map's heading comes from: GPS or the compass.
  *
- * Vive aparte de MapView, y es logica pura, porque es la regla que de verdad
- * decide el comportamiento y no hay forma de comprobarla en un navegador de
- * escritorio: haria falta moverse y girar un movil. Aqui si se puede probar.
+ * Lives apart from MapView, and is pure logic, because it is the rule that
+ * actually decides the behavior and there is no way to verify it in a desktop
+ * browser: it would require moving and turning a phone. Here it actually can
+ * be tested.
  */
 
 /**
- * Velocidad (m/s) por debajo de la cual el rumbo del GPS es ruido. ~5,4 km/h.
+ * Speed (m/s) below which the GPS heading is noise. ~5.4 km/h.
  *
- * El GPS no sabe hacia donde MIRAS, solo hacia donde te has desplazado. Parado
- * o andando despacio ese vector da bandazos de 180 grados.
+ * GPS doesn't know where you're LOOKING, only where you've moved. Stopped or
+ * walking slowly, that vector swings wildly by 180 degrees.
  */
 export const GPS_HEADING_MIN_SPEED = 1.5;
 
 /**
- * Cuanto sigue mandando el GPS tras la ultima lectura en movimiento.
+ * How long the GPS keeps priority after the last reading taken while moving.
  *
- * Sin esta inercia, cada semaforo devolveria el mando a la brujula y el mapa
- * giraria segun como sostengas el movil en vez de segun la direccion del coche.
+ * Without this inertia, every traffic light would hand control back to the
+ * compass and the map would rotate according to how you hold the phone
+ * instead of the direction of the car.
  */
 export const GPS_HEADING_TTL_MS = 6_000;
 
-/** ¿El rumbo de esta lectura de GPS es fiable? */
+/** Is this GPS reading's heading reliable? */
 export function gpsHeadingUsable(heading: number | null, speed: number | null): boolean {
   return heading !== null && !Number.isNaN(heading) && (speed ?? 0) >= GPS_HEADING_MIN_SPEED;
 }
 
-/** ¿Manda la brujula en este instante, o el GPS conserva la prioridad? */
+/** Does the compass have control right now, or does the GPS still hold priority? */
 export function compassWins(now: number, gpsHeadingUntil: number): boolean {
   return now >= gpsHeadingUntil;
 }

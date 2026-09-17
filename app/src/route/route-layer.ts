@@ -5,14 +5,14 @@ import type { Route } from '../services/routing';
 const SOURCE = 'route';
 
 /**
- * Magenta: el unico color vivo que el basemap no usa. El amarillo esta cogido
- * por las autovias y el cian por el resto de vias, asi que una ruta en
- * cualquiera de los dos se perderia encima de ellas.
+ * Magenta: the only live color the basemap doesn't use. Yellow is taken by
+ * highways and cyan by the rest of the roads, so a route in either would get
+ * lost on top of them.
  */
 const MAGENTA = '#ff003c';
 const CORE = '#ff8fa6';
 
-/** Debajo de las etiquetas, para no taparlas con la linea. */
+/** Below the labels, so the line doesn't cover them. */
 const BEFORE = 'road-label';
 
 const width = (mul: number) => [
@@ -30,17 +30,17 @@ const width = (mul: number) => [
 ];
 
 /**
- * Dibuja la ruta con el mismo truco de tres capas que el estilo del mapa:
- * halo ancho difuminado, cuerpo, y filamento fino aclarado. Asi la ruta
- * pertenece visualmente al mismo mundo que las calles.
+ * Draws the route with the same three-layer trick as the map style: a wide
+ * blurred halo, a body, and a thin lightened filament. That way the route
+ * visually belongs to the same world as the streets.
  */
 export class RouteLayer {
   private current: Route | null = null;
 
   constructor(private readonly map: Map) {
-    // `setStyle` borra fuentes y capas anadidas a mano. Pasa en cada recarga en
-    // caliente del estilo durante el desarrollo. En vez de que main.ts tenga
-    // que acordarse de repintar, la capa se recompone sola.
+    // `setStyle` wipes out hand-added sources and layers. This happens on
+    // every hot reload of the style during development. Instead of making
+    // main.ts remember to repaint, the layer recomposes itself.
     this.map.on('style.load', () => this.render());
   }
 
@@ -66,7 +66,7 @@ export class RouteLayer {
   }
 
   private render() {
-    // Durante un cambio de estilo el mapa rechaza que le anadan capas.
+    // During a style change the map refuses to have layers added to it.
     if (!this.map.isStyleLoaded()) return;
 
     this.teardown();

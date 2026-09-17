@@ -3,7 +3,7 @@
   "name": "Night City",
   "metadata": {
     "games-map:generated-by": "style/build.mjs",
-    "games-map:note": "No editar a mano. Edita build.mjs y vuelve a ejecutarlo."
+    "games-map:note": "Do not edit by hand. Edit build.mjs and rerun it."
   },
   "sources": {
     "openmaptiles": {

@@ -2,7 +2,7 @@
   "name": "games-map",
   "private": true,
   "version": "0.0.0",
-  "description": "Navegador GPS con estetica Cyberpunk 2077",
+  "description": "GPS navigator with Cyberpunk 2077 aesthetics",
   "workspaces": [
     "app"
   ],

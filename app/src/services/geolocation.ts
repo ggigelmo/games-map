@@ -1,39 +1,39 @@
 /**
- * Unico dueno del `watchPosition`. Reparte las lecturas a quien las necesite.
+ * Sole owner of `watchPosition`. Distributes readings to whoever needs them.
  *
- * Antes el dueno era el panel de diagnostico (`diag/probe.ts`), que fue lo
- * pragmatico cuando solo el HUD consumia la posicion. Con el routing entrando
- * en escena habria dos suscriptores colgando de un panel de depuracion, asi que
- * se extrae aqui.
+ * The owner used to be the diagnostics panel (`diag/probe.ts`), which was the
+ * pragmatic choice back when only the HUD consumed the position. With routing
+ * entering the picture there would be two subscribers hanging off a debug
+ * panel, so this was extracted here.
  *
- * Solo hace UNA cosa: mantener viva la suscripcion al GPS y difundir lo que
- * llega. Las estadisticas (precision media, intervalos) las calcula el panel de
- * diagnostico a partir de este flujo; no son asunto de este modulo.
+ * It does exactly ONE thing: keep the GPS subscription alive and broadcast
+ * what comes in. Statistics (average accuracy, intervals) are computed by the
+ * diagnostics panel from this stream; they are not this module's concern.
  */
 
 export interface Fix {
   lng: number;
   lat: number;
-  /** grados, o null si el GPS no lo sabe (parado) */
+  /** degrees, or null if the GPS doesn't know (stationary) */
   heading: number | null;
-  /** m/s, o null */
+  /** m/s, or null */
   speed: number | null;
   accuracy: number;
-  /** `performance.now()` de cuando llego, para medir intervalos */
+  /** `performance.now()` of when it arrived, to measure intervals */
   at: number;
 }
 
 export type GeoFailure =
   | { kind: 'unsupported' }
   /**
-   * El permiso nunca respondio. En PWAs instaladas en iOS hay un bug historico
-   * por el que el dialogo no aparece y la llamada tampoco hace timeout, asi que
-   * hace falta un temporizador propio: el de la API no salta.
+   * The permission prompt never responded. Installed PWAs on iOS have a
+   * long-standing bug where the dialog never appears and the call doesn't
+   * time out either, so a timer of our own is needed: the API's never fires.
    */
   | { kind: 'silent' }
   | { kind: 'error'; code: number; message: string };
 
-/** Cuanto esperar antes de dar el permiso por no respondido. */
+/** How long to wait before treating the permission as unanswered. */
 const SILENCE_MS = 12_000;
 
 const OPTIONS: PositionOptions = {
@@ -49,22 +49,22 @@ export class GeoWatcher {
   private silenceTimer: number | null = null;
   private answered = false;
 
-  /** Ultima lectura conocida, o null si aun no ha llegado ninguna. */
+  /** Last known reading, or null if none has arrived yet. */
   last: Fix | null = null;
 
-  /** Momento en que se llamo a `start()`, para medir el primer fix. */
+  /** Moment `start()` was called, to measure the first fix. */
   readonly startedAt = performance.now();
 
-  /** @returns funcion para darse de baja */
+  /** @returns function to unsubscribe */
   onFix(cb: (fix: Fix) => void): () => void {
     this.fixSubs.add(cb);
-    // Quien llega tarde recibe la ultima lectura en vez de esperar a la
-    // siguiente, que con el GPS puede tardar segundos.
+    // A late subscriber gets the last reading instead of waiting for the
+    // next one, which can take seconds with GPS.
     if (this.last) cb(this.last);
     return () => this.fixSubs.delete(cb);
   }
 
-  /** @returns funcion para darse de baja */
+  /** @returns function to unsubscribe */
   onFailure(cb: (failure: GeoFailure) => void): () => void {
     this.failSubs.add(cb);
     return () => this.failSubs.delete(cb);
@@ -99,8 +99,8 @@ export class GeoWatcher {
       (err) => {
         this.settle();
         const messages: Record<number, string> = {
-          1: 'PERMISO DENEGADO',
-          2: 'POSICION NO DISPONIBLE',
+          1: 'PERMISSION DENIED',
+          2: 'POSITION UNAVAILABLE',
           3: 'TIMEOUT',
         };
         this.fail({

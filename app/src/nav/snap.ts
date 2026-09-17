@@ -1,43 +1,44 @@
 /**
- * Proyectar tu posicion sobre la ruta.
+ * Projecting your position onto the route.
  *
- * Es la pieza sobre la que se apoya todo lo demas: sin saber en que punto de la
- * ruta estas, no hay siguiente giro, ni distancia restante, ni deteccion de
- * desvio. Logica pura, porque comprobarla de verdad exigiria conducir.
+ * This is the piece everything else rests on: without knowing which point of
+ * the route you're at, there's no next turn, no remaining distance, and no
+ * off-route detection. Pure logic, because really testing it would require
+ * driving.
  */
 import { distanceMeters, type Point } from '../services/geo-math';
 
 export interface Snapped {
-  /** Indice del vertice donde empieza el segmento mas cercano. */
+  /** Index of the vertex where the closest segment starts. */
   index: number;
-  /** El punto de la ruta mas cercano a ti. */
+  /** The point on the route closest to you. */
   point: Point;
-  /** Distancia perpendicular a la ruta, en metros. */
+  /** Perpendicular distance to the route, in meters. */
   distanceM: number;
-  /** Metros de ruta recorridos hasta ese punto. */
+  /** Meters of route traveled up to that point. */
   alongM: number;
 }
 
 /**
- * Cuantos vertices hacia delante se buscan desde el ultimo indice conocido.
+ * How many vertices forward to search from the last known index.
  *
- * La ventana NO es una optimizacion: sin ella, una ruta que pasa dos veces por
- * la misma calle (o una vuelta a la manzana) engancha en el tramo equivocado y
- * las indicaciones se vuelven absurdas.
+ * The window is NOT an optimization: without it, a route that passes through
+ * the same street twice (or a loop around the block) latches onto the wrong
+ * segment and the directions become absurd.
  */
 const WINDOW_FORWARD = 60;
 
-/** Y unos pocos hacia atras, porque el GPS oscila y puedes "retroceder". */
+/** And a few backward, because GPS oscillates and you can appear to "go backward". */
 const WINDOW_BACK = 8;
 
 /**
- * Si dentro de la ventana no se encuentra nada mas cerca que esto, se busca en
- * la ruta completa. Cubre el caso de reabrir la app tras conducir un rato, o un
- * salto grande del GPS.
+ * If nothing closer than this is found within the window, the whole route is
+ * searched. This covers reopening the app after driving for a while, or a
+ * large GPS jump.
  */
 const WINDOW_ESCAPE_M = 200;
 
-/** Distancia acumulada hasta cada vertice. Se calcula una vez por ruta. */
+/** Cumulative distance up to each vertex. Calculated once per route. */
 export function cumulativeMeters(coords: [number, number][]): number[] {
   const out = new Array<number>(coords.length);
   out[0] = 0;
@@ -50,10 +51,10 @@ export function cumulativeMeters(coords: [number, number][]): number[] {
 }
 
 /**
- * Convierte a metros locales tomando `origin` como centro.
+ * Converts to local meters using `origin` as the center.
  *
- * A escala de segmento (decenas de metros) la aproximacion plana es exacta de
- * sobra, y evita arrastrar trigonometria esferica a la proyeccion.
+ * At segment scale (tens of meters) the flat approximation is more than exact
+ * enough, and it avoids dragging spherical trigonometry into the projection.
  */
 function toLocal(p: Point, origin: Point): [number, number] {
   const metersPerDegLng = 111_320 * Math.cos((origin.lat * Math.PI) / 180);
@@ -66,7 +67,7 @@ interface Candidate {
   distanceM: number;
 }
 
-/** Proyeccion sobre el segmento i → i+1. */
+/** Projection onto segment i → i+1. */
 function projectOnSegment(pos: Point, coords: [number, number][], i: number): Candidate {
   const a: Point = { lng: coords[i]![0], lat: coords[i]![1] };
   const b: Point = { lng: coords[i + 1]![0], lat: coords[i + 1]![1] };
@@ -75,7 +76,7 @@ function projectOnSegment(pos: Point, coords: [number, number][], i: number): Ca
   const [bx, by] = toLocal(b, a);
   const len2 = bx * bx + by * by;
 
-  // Segmento degenerado: vertices duplicados, que Valhalla emite de vez en cuando.
+  // Degenerate segment: duplicate vertices, which Valhalla emits from time to time.
   const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (px * bx + py * by) / len2));
 
   const dx = px - t * bx;
@@ -93,9 +94,9 @@ function search(pos: Point, coords: [number, number][], from: number, to: number
 }
 
 /**
- * Encuentra el punto de la ruta mas cercano a `pos`.
+ * Finds the point on the route closest to `pos`.
  *
- * @param fromIndex ultimo indice conocido, para centrar la ventana de busqueda
+ * @param fromIndex last known index, used to center the search window
  */
 export function snapToRoute(
   pos: Point,
@@ -103,7 +104,7 @@ export function snapToRoute(
   cumulative: number[],
   fromIndex = 0,
 ): Snapped {
-  const last = coords.length - 2; // ultimo indice de segmento valido
+  const last = coords.length - 2; // last valid segment index
   if (last < 0) {
     return { index: 0, point: pos, distanceM: 0, alongM: 0 };
   }
@@ -113,7 +114,7 @@ export function snapToRoute(
 
   let best = search(pos, coords, from, to);
 
-  // Valvula de escape: si la ventana no da nada razonable, se mira todo.
+  // Escape valve: if the window doesn't yield anything reasonable, look at everything.
   if (best.distanceM > WINDOW_ESCAPE_M && (from > 0 || to < last)) {
     const global = search(pos, coords, 0, last);
     if (global.distanceM < best.distanceM) best = global;

@@ -2,15 +2,15 @@ import { formatDistance, type Point } from '../services/geo-math';
 import { autocomplete, MIN_QUERY_LENGTH, type Place } from '../services/geocoding';
 import { StadiaError } from '../services/stadia';
 
-/** Cuanto esperar tras la ultima tecla antes de preguntar al servidor. */
+/** How long to wait after the last keystroke before asking the server. */
 const DEBOUNCE_MS = 300;
 
 /**
- * Buscador a pantalla completa.
+ * Fullscreen search.
  *
- * A pantalla completa y no una barra fija porque en un movil el HUD ya va justo
- * de espacio, y la lista de resultados necesita sitio para leerse de un vistazo
- * mientras conduces.
+ * Fullscreen rather than a fixed bar because on a phone the HUD is already
+ * tight on space, and the results list needs room to be read at a glance
+ * while driving.
  */
 export class SearchOverlay {
   readonly el = document.createElement('div');
@@ -22,7 +22,7 @@ export class SearchOverlay {
   private timer: number | null = null;
   private inFlight: AbortController | null = null;
 
-  /** @param getNear posicion actual, para sesgar los resultados */
+  /** @param getNear current position, used to bias the results */
   constructor(private readonly getNear: () => Point | null) {
     this.el.className = 'search';
     this.el.hidden = true;
@@ -30,8 +30,8 @@ export class SearchOverlay {
       <div class="search__bar panel">
         <input class="search__input" type="search" enterkeyhint="search"
                autocomplete="off" autocorrect="off" spellcheck="false"
-               placeholder="¿A dónde vamos?" aria-label="Buscar destino" />
-        <button class="btn btn--ghost search__close">Cerrar</button>
+               placeholder="Where to?" aria-label="Search destination" />
+        <button class="btn btn--ghost search__close">Close</button>
       </div>
       <div class="search__status label" data-status></div>
       <ul class="search__list" data-list></ul>`;
@@ -49,8 +49,8 @@ export class SearchOverlay {
 
   open() {
     this.el.hidden = false;
-    // Abrir siempre viene de pulsar un boton, o sea de un gesto del usuario,
-    // que es lo que iOS exige para que focus() saque el teclado.
+    // Opening always comes from pressing a button, i.e. a user gesture, which
+    // is what iOS requires for focus() to bring up the keyboard.
     this.input.focus();
     this.input.select();
   }
@@ -74,17 +74,18 @@ export class SearchOverlay {
 
     if (text.length < MIN_QUERY_LENGTH) {
       this.list.replaceChildren();
-      this.status.textContent = text.length ? `Escribe al menos ${MIN_QUERY_LENGTH} letras` : '';
+      this.status.textContent = text.length ? `Type at least ${MIN_QUERY_LENGTH} letters` : '';
       return;
     }
 
-    this.status.textContent = 'Buscando…';
+    this.status.textContent = 'Searching…';
     this.timer = window.setTimeout(() => void this.run(text), DEBOUNCE_MS);
   }
 
   private async run(text: string) {
-    // Cancelar la anterior no es optimizacion: sin esto las respuestas llegan
-    // desordenadas y la lista parpadea con resultados de consultas ya viejas.
+    // Cancelling the previous request isn't an optimization: without it,
+    // responses arrive out of order and the list flickers with results from
+    // already-stale queries.
     const ctrl = new AbortController();
     this.inFlight = ctrl;
 
@@ -96,7 +97,7 @@ export class SearchOverlay {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       this.list.replaceChildren();
       this.status.textContent =
-        err instanceof StadiaError ? err.message.toUpperCase() : 'ERROR DE BÚSQUEDA';
+        err instanceof StadiaError ? err.message.toUpperCase() : 'SEARCH ERROR';
     }
   }
 
@@ -104,7 +105,7 @@ export class SearchOverlay {
     this.list.replaceChildren();
 
     if (!places.length) {
-      this.status.textContent = 'Sin resultados';
+      this.status.textContent = 'No results';
       return;
     }
     this.status.textContent = '';

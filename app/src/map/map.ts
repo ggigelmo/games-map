@@ -9,30 +9,30 @@ import {
 import type { Fix } from '../services/geolocation';
 
 /**
- * Cuantos pixeles tiene que panear el mapa para considerarlo un arrastre
- * deliberado y soltar la camara. Un pulgar apoyado se mueve unos pocos; un
- * gesto de verdad se pasa de esto de sobra.
+ * How many pixels the map has to pan to count as a deliberate drag and drop
+ * the camera. A resting thumb moves it a few; a real gesture clears this by
+ * far.
  */
 const PAN_INTENT_PX = 32;
 
-/** Zoom fijo mientras navegas: ni se acerca ni se aleja segun el viaje. */
+/** Fixed zoom while navigating: it never zooms in or out based on the trip. */
 const NAV_ZOOM = 17;
 
-/** Inclinacion en navegacion: mirar hacia delante, no en planta. */
+/** Pitch while navigating: looking ahead, not top-down. */
 const NAV_PITCH = 60;
 
 /**
- * Que fraccion del alto de pantalla se baja tu marcador respecto al centro.
+ * What fraction of the screen height your marker sits below center.
  *
- * Centrado desperdicias media pantalla mirando por donde ya has pasado. Todos
- * los navegadores te ponen en el tercio inferior por esto.
+ * Centered wastes half the screen looking at where you've already been.
+ * Every navigation app puts you in the lower third for this reason.
  */
 const NAV_OFFSET_RATIO = 0.22;
 
-/** Grados minimos para molestarse en girar la camara con la brujula. */
+/** Minimum degrees before bothering to turn the camera with the compass. */
 const CAMERA_TURN_DEG = 4;
 
-/** Chevron del jugador: cian con halo, apuntando al rumbo. */
+/** Player chevron: cyan with a glow, pointing at the heading. */
 function playerMarkerEl(): HTMLElement {
   const el = document.createElement('div');
   el.style.willChange = 'transform';
@@ -54,8 +54,8 @@ function playerMarkerEl(): HTMLElement {
   return el;
 }
 
-// `Fix` lo define quien lo produce: services/geolocation.ts. Se reexporta para
-// no obligar a los consumidores del mapa a saber de donde sale.
+// `Fix` is defined by whoever produces it: services/geolocation.ts. Re-exported
+// so consumers of the map don't need to know where it comes from.
 export type { Fix } from '../services/geolocation';
 
 export class MapView {
@@ -64,20 +64,20 @@ export class MapView {
   private markerInner = playerMarkerEl();
   private lastHeading = 0;
   private _following = true;
-  /** Hasta cuando el rumbo del GPS tiene prioridad sobre la brujula. */
+  /** Until when the GPS heading takes priority over the compass. */
   private gpsHeadingUntil = 0;
   private compassActive = false;
   private navMode = false;
 
   /**
-   * Avisa de los cambios de `following` para que la UI pueda reflejarlos.
+   * Announces changes to `following` so the UI can reflect them.
    *
-   * Sin esto el seguimiento se apagaba en silencio y la app parecia rota: el
-   * mapa dejaba de seguirte sin que nada en pantalla dijera por que.
+   * Without this, following silently turned off and the app looked broken:
+   * the map stopped tracking you with nothing on screen saying why.
    */
   onFollowingChange: ((following: boolean) => void) | null = null;
 
-  /** Si true, la camara persigue al jugador. */
+  /** If true, the camera follows the player. */
   get following(): boolean {
     return this._following;
   }
@@ -92,37 +92,38 @@ export class MapView {
     this.map = new maplibregl.Map({
       container,
       style,
-      center: [-3.7038, 40.4168], // Madrid, hasta que llegue el primer fix
+      center: [-3.7038, 40.4168], // Madrid, until the first fix arrives
       zoom: 15,
       pitch: 55,
       bearing: 0,
       attributionControl: { compact: true },
-      // Sin estos dos el mapa se siente como una web, no como un juego.
+      // Without these two the map feels like a website, not a game.
       dragRotate: true,
       pitchWithRotate: true,
     });
 
     this.map.touchZoomRotate.enableRotation();
 
-    // MapLibre mide el contenedor UNA vez, al construirse. Si en ese momento
-    // mide 0 (pestana en segundo plano, arranque de una PWA, rotacion de
-    // pantalla, teclado del movil), el canvas se queda en su tamano de
-    // emergencia y el mapa no vuelve a pintar nunca. Hay que reavisarle.
+    // MapLibre measures the container ONCE, at construction. If it measures 0
+    // at that point (backgrounded tab, PWA cold start, screen rotation, mobile
+    // keyboard), the canvas gets stuck at its emergency size and the map never
+    // paints again. It needs to be nudged.
     new ResizeObserver(() => this.map.resize()).observe(container);
 
     this.watchForIntentionalPan();
   }
 
   /**
-   * Suelta la camara solo ante un arrastre DELIBERADO.
+   * Releases the camera only on a DELIBERATE drag.
    *
-   * Antes bastaba con el evento `dragstart`, que salta al primer pixel: un
-   * pulgar apoyado en la pantalla apagaba el seguimiento para el resto de la
-   * sesion, y nada lo indicaba. Ahora se mide cuanto ha paneado el mapa de
-   * verdad y solo se suelta al pasar del umbral; un roce no cuenta.
+   * It used to be enough to listen for `dragstart`, which fires on the first
+   * pixel: a thumb resting on the screen would turn off following for the
+   * rest of the session, with nothing indicating it. Now it measures how much
+   * the map has actually panned and only lets go past the threshold; a brush
+   * of the screen doesn't count.
    *
-   * El zoom con dos dedos NO lo suelta (dispara `zoomstart`, no `dragstart`),
-   * asi que puedes acercarte y alejarte sin perder el seguimiento.
+   * Two-finger zoom does NOT release it (it fires `zoomstart`, not
+   * `dragstart`), so you can zoom in and out without losing following.
    */
   private watchForIntentionalPan() {
     let anchor: LngLat | null = null;
@@ -133,8 +134,8 @@ export class MapView {
 
     this.map.on('drag', () => {
       if (!this.following || !anchor) return;
-      // project() del centro actual devuelve siempre el centro del lienzo, asi
-      // que esta distancia es literalmente cuantos pixeles se ha movido el mapa.
+      // project() of the current center always returns the canvas center, so
+      // this distance is literally how many pixels the map has moved.
       const from = this.map.project(anchor);
       const to = this.map.project(this.map.getCenter());
       if (Math.hypot(from.x - to.x, from.y - to.y) > PAN_INTENT_PX) {
@@ -147,7 +148,7 @@ export class MapView {
     });
   }
 
-  /** Aplica un estilo nuevo conservando la camara. Lo usa el HMR. */
+  /** Applies a new style while keeping the camera. Used by HMR. */
   setStyle(style: StyleSpecification) {
     this.map.setStyle(style, { diff: true });
   }
@@ -159,19 +160,19 @@ export class MapView {
       this.marker = new maplibregl.Marker({ element: this.markerInner, rotationAlignment: 'map' })
         .setLngLat(lngLat)
         .addTo(this.map);
-      // Primer fix: saltar sin animar, para no ver un vuelo desde Madrid.
+      // First fix: jump without animating, so we don't see a flight from Madrid.
       this.map.jumpTo({ center: lngLat, zoom: 16.5 });
     } else {
       this.marker.setLngLat(lngLat);
     }
 
-    // coords.heading es null cuando estas parado; conservamos el ultimo bueno.
+    // coords.heading is null while stopped; we keep the last good value.
     if (fix.heading !== null && !Number.isNaN(fix.heading)) {
-      const enMarcha = gpsHeadingUsable(fix.heading, fix.speed);
-      // Con la brujula activa, a poca velocidad se prefiere ella. Sin brujula,
-      // el rumbo del GPS es lo unico que hay, aunque sea malo.
-      if (enMarcha || !this.compassActive) this.lastHeading = fix.heading;
-      if (enMarcha) this.gpsHeadingUntil = performance.now() + GPS_HEADING_TTL_MS;
+      const moving = gpsHeadingUsable(fix.heading, fix.speed);
+      // With the compass active, at low speed it's preferred. Without a
+      // compass, the GPS heading is all there is, even if it's bad.
+      if (moving || !this.compassActive) this.lastHeading = fix.heading;
+      if (moving) this.gpsHeadingUntil = performance.now() + GPS_HEADING_TTL_MS;
     }
     this.marker.setRotation(this.lastHeading);
 
@@ -181,8 +182,8 @@ export class MapView {
         bearing: this.lastHeading,
         duration: 900,
         easing: (t) => t * (2 - t),
-        // En una app de navegacion el movimiento de camara no es decorativo:
-        // sin esto, "Reducir movimiento" de iOS lo descartaria.
+        // In a navigation app camera motion isn't decorative: without this,
+        // iOS's "Reduce Motion" would drop it.
         essential: true,
         ...(this.navMode
           ? { zoom: NAV_ZOOM, pitch: NAV_PITCH, offset: this.navOffset() }
@@ -192,9 +193,9 @@ export class MapView {
   }
 
   /**
-   * Rumbo de la brujula del dispositivo. Solo se aplica cuando el GPS no tiene
-   * nada mejor que decir: en marcha manda el GPS, porque con el movil en un
-   * soporte la orientacion del aparato no es la direccion del coche.
+   * Device compass heading. Only applied when the GPS has nothing better to
+   * say: while moving the GPS wins, because with the phone in a mount the
+   * device's orientation isn't the car's direction.
    */
   setCompassHeading(deg: number) {
     this.compassActive = true;
@@ -203,8 +204,8 @@ export class MapView {
     this.lastHeading = deg;
     this.marker?.setRotation(deg);
 
-    // La brujula emite hasta 10 veces por segundo. Girar la camara en cada
-    // lectura la dejaria temblando, asi que solo se mueve ante giros de verdad.
+    // The compass fires up to 10 times a second. Turning the camera on every
+    // reading would leave it shaking, so it only moves on a real turn.
     if (this.following && angleDelta(this.map.getBearing(), deg) > CAMERA_TURN_DEG) {
       this.map.easeTo({ bearing: deg, duration: 450, essential: true });
     }
@@ -225,17 +226,18 @@ export class MapView {
     }
   }
 
-  /** Desplaza el centro para dejar tu marcador en el tercio inferior. */
+  /** Shifts the center to leave your marker in the lower third. */
   private navOffset(): [number, number] {
     return [0, this.map.getContainer().clientHeight * NAV_OFFSET_RATIO];
   }
 
   /**
-   * Entra en modo navegacion: baja a nivel de calle y se queda ahi.
+   * Enters navigation mode: drops to street level and stays there.
    *
-   * Es el arreglo de la queja "cuanto mas lejos esta el destino, menos zoom se
-   * hace". La vista previa (`fitRoute`) y esta son dos camaras distintas a
-   * proposito, porque sirven para dos cosas incompatibles.
+   * This is the fix for the complaint "the farther the destination, the less
+   * it zooms in". The preview camera (`fitRoute`) and this one are two
+   * distinct cameras on purpose, because they serve two incompatible
+   * purposes.
    */
   startNavigation() {
     this.navMode = true;
@@ -258,11 +260,12 @@ export class MapView {
   }
 
   /**
-   * Encuadra la ruta completa. Suelta la camara a proposito: quieres ver por
-   * donde va antes de arrancar, y RECENTRAR la devuelve a seguirte.
+   * Frames the whole route. Releases the camera on purpose: you want to see
+   * where it goes before starting, and RECENTER brings it back to following.
    *
-   * El relleno inferior es mayor que el superior porque abajo estan la tarjeta
-   * de ruta y los botones; sin eso la ruta queda escondida detras del HUD.
+   * The bottom padding is bigger than the top because the route card and
+   * buttons live down there; without that the route would be hidden behind
+   * the HUD.
    */
   fitRoute(bounds: [[number, number], [number, number]]) {
     this.following = false;

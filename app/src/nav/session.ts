@@ -1,13 +1,14 @@
 /**
- * Estado de la navegacion. La unica parte impura de `nav/`: mantiene el estado,
- * consume las lecturas del GPS, llama a las funciones puras y avisa a la UI.
+ * Navigation state. The only impure part of `nav/`: holds the state,
+ * consumes GPS readings, calls the pure functions, and notifies the UI.
  *
- *   idle ──(elige destino)──▶ preview ──(IR)──▶ navigating ──(PARAR)──▶ idle
- *                                └──────────(X)──────────────────────────┘
+ *   idle ──(pick destination)──▶ preview ──(GO)──▶ navigating ──(STOP)──▶ idle
+ *                                   └──────────(X)──────────────────────────┘
  */
 import type { Point } from '../services/geo-math';
 import type { Fix } from '../services/geolocation';
 import type { Route } from '../services/routing';
+import { initialAnnounce, updateAnnounce, type AnnounceState } from './announce';
 import { initialOffRoute, updateOffRoute, type OffRouteState } from './off-route';
 import { computeProgress, type Progress } from './progress';
 import { cumulativeMeters, snapToRoute, type Snapped } from './snap';
@@ -18,24 +19,24 @@ export interface NavUpdate {
   progress: Progress;
   snapped: Snapped;
   offRoute: boolean;
-  /** Hay un recalculo en vuelo. */
+  /** A reroute is in flight. */
   rerouting: boolean;
 }
 
-/** A donde vas: hace falta la posicion, no solo el nombre, para recalcular. */
+/** Where you're going: needs the position, not just the name, to reroute. */
 export interface Destination extends Point {
   label: string;
 }
 
-/** Metros al destino por debajo de los cuales se considera que has llegado. */
+/** Meters to the destination below which you're considered to have arrived. */
 const ARRIVAL_M = 40;
 
 /**
- * Minimo entre recalculos.
+ * Minimum time between reroutes.
  *
- * Sin este freno, un desvio persistente (una calle mal cartografiada, un atajo
- * deliberado) pediria una ruta nueva en cada lectura del GPS: varias por
- * segundo contra la API, y la tarjeta parpadeando sin parar.
+ * Without this brake, a persistent deviation (a street mapped wrong, a
+ * deliberate shortcut) would request a new route on every GPS reading:
+ * several per second against the API, and the card flickering nonstop.
  */
 const MIN_REROUTE_MS = 15_000;
 
@@ -45,25 +46,29 @@ export class NavSession {
   private cumulative: number[] = [];
   private lastIndex = 0;
   private off: OffRouteState = initialOffRoute;
+  private announce: AnnounceState = initialAnnounce;
   private _destination: Destination | null = null;
   private _rerouting = false;
   /**
-   * -Infinity, no 0: cero es una marca de tiempo LEGITIMA (la que devuelve
-   * performance.now() recien arrancado), asi que usarlo de centinela de "nunca"
-   * anulaba el freno entre recalculos. Lo cazo un test con reloj falso.
+   * -Infinity, not 0: zero is a LEGITIMATE timestamp (the one performance.now()
+   * returns right after startup), so using it as a "never" sentinel defeated
+   * the brake between reroutes. A test with a fake clock caught this.
    */
   private lastRerouteAt = -Infinity;
 
   onPhase: ((phase: NavPhase) => void) | null = null;
   onUpdate: ((update: NavUpdate) => void) | null = null;
   onArrived: (() => void) | null = null;
+  /** Time to say `text` out loud. Whoever listens decides how (VoiceGuide). */
+  onAnnounce: ((text: string) => void) | null = null;
 
   /**
-   * Hace falta una ruta nueva desde `from`. Quien escucha hace la peticion y
-   * responde con `replaceRoute()` o `rerouteFailed()`.
+   * A new route is needed from `from`. Whoever listens makes the request and
+   * responds with `replaceRoute()` or `rerouteFailed()`.
    *
-   * La sesion no habla con la red a proposito: asi no depende de HTTP y se
-   * puede probar entera con lecturas sinteticas.
+   * The session deliberately doesn't talk to the network: that way it
+   * doesn't depend on HTTP and the whole state machine can be tested with
+   * synthetic readings, which is the only way to verify this without driving.
    */
   onNeedsReroute: ((from: Fix, to: Destination) => void) | null = null;
 
@@ -83,7 +88,7 @@ export class NavSession {
     return this._route;
   }
 
-  /** Ruta calculada: pasa a vista previa, sin empezar a navegar. */
+  /** Route calculated: moves to preview, without starting to navigate. */
   preview(route: Route, destination: Destination) {
     this._destination = destination;
     this.adopt(route);
@@ -91,8 +96,8 @@ export class NavSession {
   }
 
   /**
-   * Ruta nueva tras un desvio. No cambia de fase: sigues navegando, solo por
-   * otro camino.
+   * New route after a deviation. Doesn't change phase: you're still
+   * navigating, just via a different path.
    */
   replaceRoute(route: Route) {
     if (this._phase !== 'navigating') return;
@@ -100,41 +105,43 @@ export class NavSession {
     this.adopt(route);
   }
 
-  /** El recalculo no salio. Se reintentara pasado el intervalo minimo. */
+  /** The reroute didn't work out. It will be retried after the minimum interval. */
   rerouteFailed() {
     this._rerouting = false;
   }
 
-  /** Estado derivado de una ruta, se estrene o se sustituya. */
+  /** State derived from a route, whether it's brand new or a replacement. */
   private adopt(route: Route) {
     this._route = route;
-    // Se calcula una vez por ruta, no en cada lectura del GPS.
+    // Computed once per route, not on every GPS reading.
     this.cumulative = cumulativeMeters(route.coordinates);
     this.lastIndex = 0;
     this.off = initialOffRoute;
+    this.announce = initialAnnounce;
   }
 
-  /** El usuario ha pulsado IR. */
+  /** The user has pressed GO. */
   start() {
     if (!this._route) return;
     this.setPhase('navigating');
   }
 
-  /** PARAR, la X, o haber llegado. */
+  /** STOP, the X, or having arrived. */
   stop() {
     this._route = null;
     this.cumulative = [];
     this._destination = null;
     this.lastIndex = 0;
     this.off = initialOffRoute;
+    this.announce = initialAnnounce;
     this._rerouting = false;
     this.lastRerouteAt = -Infinity;
     this.setPhase('idle');
   }
 
   /**
-   * Una lectura nueva del GPS. Solo hace algo navegando: en vista previa la
-   * ruta no cambia por moverte un poco.
+   * A new GPS reading. Only does something while navigating: in preview the
+   * route doesn't change just because you moved a little.
    */
   consume(fix: Fix) {
     if (this._phase !== 'navigating' || !this._route) return;
@@ -145,7 +152,16 @@ export class NavSession {
     this.off = updateOffRoute(this.off, snapped.distanceM, fix.accuracy);
     const progress = computeProgress(snapped, this._route, this.cumulative);
 
-    if (this.off.off) this.maybeReroute(fix);
+    if (this.off.off) {
+      this.maybeReroute(fix);
+    } else {
+      // Only announce while confirmed on-route: off it, the "next" maneuver
+      // no longer means anything, and announcing it would confuse more than
+      // silence would.
+      const { state, toSpeak } = updateAnnounce(this.announce, progress);
+      this.announce = state;
+      if (toSpeak) this.onAnnounce?.(toSpeak);
+    }
 
     this.onUpdate?.({
       progress,
@@ -154,17 +170,17 @@ export class NavSession {
       rerouting: this._rerouting,
     });
 
-    // Llegar solo cuenta si de verdad estas sobre la ruta: fuera de ella, la
-    // distancia restante no significa nada.
+    // Arriving only counts if you're really on the route: off it, the
+    // remaining distance doesn't mean anything.
     if (!this.off.off && progress.remainingM < ARRIVAL_M) {
-      // Parar primero: `stop()` lleva a la fase idle, que limpia la interfaz.
-      // Avisando antes, el mensaje de llegada se borraria a si mismo.
+      // Stop first: `stop()` moves to the idle phase, which clears the UI.
+      // Notifying before that would erase the arrival message itself.
       this.stop();
       this.onArrived?.();
     }
   }
 
-  /** Pide ruta nueva si toca: fuera de ruta, sin otra en vuelo, y sin prisa. */
+  /** Requests a new route if it's time: off route, none other in flight, and not too soon. */
   private maybeReroute(fix: Fix) {
     if (this._rerouting || !this._destination || !this.onNeedsReroute) return;
 

@@ -1,54 +1,58 @@
 /**
- * Mantener la pantalla encendida.
+ * Keep the screen on.
  *
- * Ya habia codigo de Wake Lock en main.ts y no funcionaba en el iPhone del
- * usuario. Tres causas posibles, ninguna descartable sin el dispositivo:
+ * There was already Wake Lock code in main.ts and it didn't work on the
+ * user's iPhone. Three possible causes, none rule-out-able without the
+ * device:
  *
- *  1. La API estuvo **rota en PWAs instaladas hasta iOS 18.4**.
- *  2. El sistema suelta el bloqueo por su cuenta y nadie lo volvia a pedir:
- *     solo se reintentaba en `visibilitychange`, no al oir el evento `release`.
- *  3. La peticion se hacia al cargar la pagina, cuando el documento puede no
- *     estar aun visible, y entonces lanza `NotAllowedError` sin reintento.
+ *  1. The API was **broken in installed PWAs up through iOS 18.4**.
+ *  2. The system releases the lock on its own and nothing ever asked for it
+ *     again: it only retried on `visibilitychange`, not on hearing the
+ *     `release` event.
+ *  3. The request was made on page load, when the document may not yet be
+ *     visible, in which case it throws `NotAllowedError` with no retry.
  *
- * En vez de reimplementarlo se usa **nosleep.js**, que ya cubre las tres: pide
- * la Wake Lock API cuando existe, escucha su liberacion, reintenta al volver a
- * primer plano, y si no hay API cae a reproducir un video mudo de un fotograma
- * en bucle, que es el truco que mantiene despierto a iOS desde antes de que la
- * API existiera. Hacerlo a mano significaria incrustar los mismos bytes.
+ * Instead of reimplementing it, this uses **nosleep.js**, which already
+ * covers all three: it requests the Wake Lock API when it exists, listens
+ * for its release, retries on returning to the foreground, and if there's no
+ * API falls back to looping a silent one-frame video, which is the trick
+ * that has kept iOS awake since before the API existed. Doing it by hand
+ * would mean embedding the same bytes.
  *
- * Este modulo solo aporta lo que falta: saber QUE via esta activa, para que el
- * panel DIAG lo diga y la proxima vez no haya que adivinar.
+ * This module only adds what's missing: knowing WHICH method is active, so
+ * the DIAG panel can say so and next time there's no need to guess.
  */
 import NoSleep from 'nosleep.js';
 
-export type KeepAwakeMethod = 'API' | 'VIDEO' | 'NINGUNO';
+export type KeepAwakeMethod = 'API' | 'VIDEO' | 'NONE';
 
 /**
- * La misma condicion que usa nosleep.js para decidir. Se comprueba aqui en vez
- * de leer sus campos privados.
+ * The same condition nosleep.js uses to decide. Checked here instead of
+ * reading its private fields.
  */
 const HAS_API = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
 
 export class KeepAwake {
   private noSleep = new NoSleep();
-  /** Si el usuario/la app quiere la pantalla encendida. */
+  /** Whether the user/app wants the screen on. */
   private wanted = false;
 
-  method: KeepAwakeMethod = 'NINGUNO';
+  method: KeepAwakeMethod = 'NONE';
   onChange: ((method: KeepAwakeMethod) => void) | null = null;
 
   constructor() {
-    // El video se puede pausar al volver del segundo plano, y una peticion de
-    // API que fallo por documento no visible merece otra oportunidad.
+    // The video can pause on returning from the background, and an API
+    // request that failed because the document wasn't visible deserves
+    // another chance.
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.wanted) void this.enable();
     });
   }
 
   /**
-   * Conviene llamarlo tambien desde un gesto del usuario (un click): es cuando
-   * iOS es mas propenso a conceder el bloqueo, y el video necesita el gesto
-   * para poder arrancar.
+   * Worth calling this from a user gesture too (a click): that's when iOS is
+   * most likely to grant the lock, and the video needs the gesture to be
+   * able to start.
    */
   async enable(): Promise<KeepAwakeMethod> {
     this.wanted = true;
@@ -56,8 +60,8 @@ export class KeepAwake {
       await this.noSleep.enable();
       this.set(HAS_API ? 'API' : 'VIDEO');
     } catch {
-      // Sin bloqueo la app sigue funcionando; solo se apaga la pantalla.
-      this.set('NINGUNO');
+      // Without a lock the app still works; only the screen turns off.
+      this.set('NONE');
     }
     return this.method;
   }
@@ -67,9 +71,9 @@ export class KeepAwake {
     try {
       this.noSleep.disable();
     } catch {
-      // Da igual: si no se pudo soltar, el sistema lo hara al cerrar.
+      // Doesn't matter: if it couldn't be released, the system will on close.
     }
-    this.set('NINGUNO');
+    this.set('NONE');
   }
 
   private set(method: KeepAwakeMethod) {

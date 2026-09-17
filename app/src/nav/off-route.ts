@@ -1,19 +1,19 @@
 /**
- * Deteccion de desvio. En la fase 3a solo detecta, para que la tarjeta pueda
- * decir FUERA DE RUTA en vez de seguir dando indicaciones de una ruta que ya no
- * sigues. El recalculo automatico llega en la 3b.
+ * Off-route detection. In phase 3a it only detects, so the card can say OFF
+ * ROUTE instead of continuing to give directions for a route you're no longer
+ * following. Automatic recalculation arrives in 3b.
  *
- * Reductor puro: entra el estado anterior y una lectura, sale el estado nuevo.
+ * Pure reducer: takes the previous state and a reading, returns the new state.
  */
 
-/** Nunca se baja de aqui, por muy fino que diga ser el GPS. */
+/** Never goes below this, no matter how precise the GPS claims to be. */
 const FLOOR_M = 35;
 
-/** Cuantas lecturas seguidas fuera hacen falta para declararlo. */
+/** How many consecutive out-of-range readings are needed to declare it. */
 const STREAK_TO_DECLARE = 3;
 
 export interface OffRouteState {
-  /** Lecturas consecutivas por encima del umbral. */
+  /** Consecutive readings above the threshold. */
   streak: number;
   off: boolean;
 }
@@ -21,11 +21,11 @@ export interface OffRouteState {
 export const initialOffRoute: OffRouteState = { streak: 0, off: false };
 
 /**
- * Umbral atado a la precision de CADA lectura, no fijo.
+ * Threshold tied to the accuracy of EACH reading, not fixed.
  *
- * Con un umbral fijo de 30 m, un fix de +-50 m en una calle estrecha lo dispara
- * constantemente y la app se pasa el viaje creyendo que te has salido. La
- * precision del GPS tiene que entrar en la cuenta.
+ * With a fixed 30 m threshold, a +-50 m fix on a narrow street triggers it
+ * constantly and the app spends the whole trip thinking you've gone off
+ * route. GPS accuracy has to be part of the calculation.
  */
 export function offRouteThreshold(accuracyM: number): number {
   return Math.max(FLOOR_M, accuracyM * 2.5);
@@ -36,11 +36,11 @@ export function updateOffRoute(
   distanceM: number,
   accuracyM: number,
 ): OffRouteState {
-  const fuera = distanceM > offRouteThreshold(accuracyM);
+  const outOfRange = distanceM > offRouteThreshold(accuracyM);
 
-  if (!fuera) {
-    // Una sola lectura buena basta para volver: si estas sobre la ruta, estas
-    // sobre la ruta. La histeresis es solo para DECLARAR el desvio.
+  if (!outOfRange) {
+    // A single good reading is enough to return: if you're on the route,
+    // you're on the route. The hysteresis is only for DECLARING off-route.
     return initialOffRoute;
   }
 

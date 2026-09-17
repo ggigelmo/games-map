@@ -1,16 +1,16 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
 
-  // Este Worker no tiene codigo: solo sirve archivos estaticos. Por eso no
-  // lleva "main". Cuando la fase 2 necesite esconder la clave de Stadia detras
-  // de un proxy, ese codigo entra aqui como "main" y convive con los assets.
+  // This Worker has no code: it only serves static assets. That's why it
+  // doesn't carry "main". If a future phase needs to hide the Stadia key
+  // behind a proxy, that code goes here as "main" and lives alongside the assets.
   "name": "games-map",
   "compatibility_date": "2026-09-07",
 
   "assets": {
-    // Relativo a la raiz del repo, que es el Root directory del build.
+    // Relative to the repo root, which is the build's Root directory.
     "directory": "./app/dist",
-    // Cualquier ruta no encontrada devuelve index.html con 200, en vez de 404.
+    // Any route not found returns index.html with 200, instead of 404.
     "not_found_handling": "single-page-application"
   }
 }

@@ -1,24 +1,26 @@
 /**
- * Que giro viene y cuanto queda. Logica pura sobre el resultado de snapToRoute.
+ * Which turn is next and how far it is. Pure logic over the result of
+ * snapToRoute.
  */
 import type { Maneuver, Route } from '../services/routing';
 import type { Snapped } from './snap';
 
 export interface Progress {
-  /** La maniobra que tienes por delante, o null si ya no queda ninguna. */
+  /** The maneuver ahead of you, or null if none remain. */
   next: Maneuver | null;
-  /** Metros hasta esa maniobra. */
+  /** Meters until that maneuver. */
   distanceToNextM: number;
-  /** Metros que quedan de viaje. */
+  /** Meters remaining in the trip. */
   remainingM: number;
-  /** Segundos que quedan de viaje. */
+  /** Seconds remaining in the trip. */
   remainingS: number;
 }
 
 /**
- * `begin_shape_index` de Valhalla marca DONDE ocurre la maniobra. Estando entre
- * la maniobra i y la i+1, el giro que hay que anunciar es el de la i+1: la i es
- * la que ya ejecutaste (o el "salga y siga por tal calle" inicial).
+ * Valhalla's `begin_shape_index` marks WHERE the maneuver occurs. Between
+ * maneuver i and i+1, the turn that needs to be announced is i+1: maneuver i
+ * is the one you already executed (or the initial "head out and continue on
+ * such street").
  */
 export function computeProgress(
   snapped: Snapped,
@@ -38,30 +40,30 @@ export function computeProgress(
 }
 
 /**
- * Tiempo restante sumando el de las maniobras que quedan.
+ * Remaining time by summing the time of the maneuvers left.
  *
- * Prorratear sobre la distancia total seria mas simple pero mentiria en cuanto
- * el viaje mezcle ciudad y autovia: los mismos metros no cuestan lo mismo.
- * Aqui se suma el tiempo de cada maniobra pendiente y se prorratea solo el
- * tramo de la que estas recorriendo ahora.
+ * Prorating over the total distance would be simpler but would lie as soon as
+ * the trip mixes city and highway: the same meters don't cost the same. Here
+ * the time of each pending maneuver is summed, and only the segment you're
+ * currently on gets prorated.
  */
 function remainingSeconds(snapped: Snapped, route: Route): number {
   const ms = route.maneuvers;
   let total = 0;
-  let actual: Maneuver | null = null;
+  let current: Maneuver | null = null;
 
   for (const m of ms) {
     if (m.beginIndex > snapped.index) total += m.timeS;
-    else actual = m;
+    else current = m;
   }
 
-  if (actual) {
-    // Fraccion del tramo actual que queda por recorrer, en vertices.
-    const siguiente = ms.find((m) => m.beginIndex > snapped.index);
-    const finIndex = siguiente ? siguiente.beginIndex : snapped.index + 1;
-    const largo = Math.max(1, finIndex - actual.beginIndex);
-    const hecho = Math.max(0, Math.min(largo, snapped.index - actual.beginIndex));
-    total += actual.timeS * (1 - hecho / largo);
+  if (current) {
+    // Fraction of the current segment remaining to be traveled, in vertices.
+    const upcoming = ms.find((m) => m.beginIndex > snapped.index);
+    const endIndex = upcoming ? upcoming.beginIndex : snapped.index + 1;
+    const segmentLength = Math.max(1, endIndex - current.beginIndex);
+    const traveled = Math.max(0, Math.min(segmentLength, snapped.index - current.beginIndex));
+    total += current.timeS * (1 - traveled / segmentLength);
   }
 
   return Math.max(0, total);

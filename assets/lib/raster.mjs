@@ -1,16 +1,17 @@
 /**
- * Rasterizador RGBA minimo y codificador PNG, sin dependencias.
+ * Minimal RGBA rasterizer and PNG encoder, with no dependencies.
  *
- * Lo usan assets/make-icons.mjs (iconos de la PWA) y assets/make-sprite.mjs
- * (sprite de POI del mapa). Existe para no arrastrar una cadena de build de
- * SVG solo para dibujar unas decenas de glifos.
+ * Used by assets/make-icons.mjs (PWA icons) and assets/make-sprite.mjs (map
+ * POI sprite). It exists so we don't have to drag in an SVG build chain just
+ * to draw a few dozen glyphs.
  *
- * El antialiasing no se hace por primitiva: se dibuja todo a `ss` veces la
- * resolucion y se reduce al final con una media de caja. Sale mas simple y la
- * calidad es uniforme en rellenos, trazos y halos.
+ * Antialiasing is not done per primitive: everything is drawn at `ss` times
+ * the resolution and downsampled at the end with a box average. This comes
+ * out simpler, and quality is uniform across fills, strokes and halos.
  *
- * El buffer guarda alfa PREMULTIPLICADO, que convierte el compuesto src-over
- * en una interpolacion lineal por canal. Se desmultiplica al codificar.
+ * The buffer stores PREMULTIPLIED alpha, which turns src-over compositing
+ * into a per-channel linear interpolation. It gets unpremultiplied when
+ * encoding.
  */
 import { deflateSync } from 'node:zlib';
 
@@ -20,7 +21,7 @@ export const hex = (h) => [
   parseInt(h.slice(5, 7), 16),
 ];
 
-/** Rectangulo como puntos de poligono. */
+/** Rectangle as polygon points. */
 export const rect = (x0, y0, x1, y1) => [
   [x0, y0],
   [x1, y0],
@@ -28,7 +29,7 @@ export const rect = (x0, y0, x1, y1) => [
   [x0, y1],
 ];
 
-/** Caja de esquinas cortadas en diagonal: la firma visual de CP2077. */
+/** Box with diagonally chamfered corners: CP2077's visual signature. */
 export const chamfered = (x0, y0, x1, y1, c) => [
   [x0 + c, y0],
   [x1, y0],
@@ -40,9 +41,9 @@ export const chamfered = (x0, y0, x1, y1, c) => [
 
 export class Canvas {
   /**
-   * @param w  ancho en unidades logicas
-   * @param h  alto en unidades logicas
-   * @param ss factor de supermuestreo (todo se dibuja a wxss)
+   * @param w  width in logical units
+   * @param h  height in logical units
+   * @param ss supersampling factor (everything is drawn at w*ss)
    */
   constructor(w, h, ss = 1) {
     this.w = w;
@@ -50,7 +51,7 @@ export class Canvas {
     this.ss = ss;
     this.pw = Math.round(w * ss);
     this.ph = Math.round(h * ss);
-    // [r, g, b, a] premultiplicado, 0..255
+    // [r, g, b, a] premultiplied, 0..255
     this.px = new Float32Array(this.pw * this.ph * 4);
   }
 
@@ -63,7 +64,7 @@ export class Canvas {
     }
   }
 
-  /** src-over en un pixel FISICO. */
+  /** src-over on a PHYSICAL pixel. */
   #blendPx(px, py, color, a) {
     if (a <= 0 || px < 0 || py < 0 || px >= this.pw || py >= this.ph) return;
     const k = a > 1 ? 1 : a;
@@ -76,8 +77,8 @@ export class Canvas {
   }
 
   /**
-   * Segmento de grosor w en unidades logicas. `glow` anade un halo exterior
-   * que decae al cuadrado: es lo que convierte una raya en un tubo de neon.
+   * Segment of width w in logical units. `glow` adds an outer halo that
+   * falls off quadratically: this is what turns a stroke into a neon tube.
    */
   segment(x0, y0, x1, y1, w, color, { alpha = 1, glow = 0 } = {}) {
     const s = this.ss;
@@ -109,7 +110,7 @@ export class Canvas {
     }
   }
 
-  /** Cadena de segmentos. `close` la cierra sobre el primer punto. */
+  /** Chain of segments. `close` closes it back onto the first point. */
   polyline(pts, w, color, { alpha = 1, glow = 0, close = false } = {}) {
     const n = pts.length;
     const last = close ? n : n - 1;
@@ -120,7 +121,7 @@ export class Canvas {
     }
   }
 
-  /** Relleno por regla par-impar. */
+  /** Fill using the even-odd rule. */
   polygon(pts, color, { alpha = 1 } = {}) {
     const s = this.ss;
     const p = pts.map(([x, y]) => [x * s, y * s]);
@@ -150,11 +151,11 @@ export class Canvas {
   }
 
   circle(cx, cy, r, color, { alpha = 1, glow = 0 } = {}) {
-    // Un segmento de longitud cero ya es un disco con halo.
+    // A zero-length segment is already a disc with a halo.
     this.segment(cx, cy, cx, cy, r * 2, color, { alpha, glow });
   }
 
-  /** Reduce a resolucion logica con media de caja y desmultiplica el alfa. */
+  /** Downsamples to logical resolution with a box average and unpremultiplies alpha. */
   #resolve() {
     const { ss, w, h } = this;
     const out = new Uint8Array(w * h * 4);
@@ -181,7 +182,7 @@ export class Canvas {
         const o = (y * w + x) * 4;
         const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
         if (a > 0.5) {
-          const k = 255 / a; // desmultiplicar
+          const k = 255 / a; // unpremultiply
           out[o] = clamp(r * k);
           out[o + 1] = clamp(g * k);
           out[o + 2] = clamp(b * k);
@@ -192,12 +193,12 @@ export class Canvas {
     return out;
   }
 
-  /** Pixeles resueltos, RGBA sin premultiplicar. */
+  /** Resolved pixels, RGBA without premultiplication. */
   pixels() {
     return this.#resolve();
   }
 
-  /** Copia pixeles RGBA ya resueltos dentro de este lienzo (sin supermuestreo). */
+  /** Copies already-resolved RGBA pixels into this canvas (no supersampling). */
   blit(rgba, srcW, srcH, dx, dy) {
     for (let y = 0; y < srcH; y++) {
       for (let x = 0; x < srcW; x++) {
@@ -206,7 +207,7 @@ export class Canvas {
         if (a <= 0) continue;
         const o = ((dy + y) * this.pw + (dx + x)) * 4;
         if (dx + x < 0 || dx + x >= this.pw || dy + y < 0 || dy + y >= this.ph) continue;
-        // Entra premultiplicado, porque asi guarda este buffer.
+        // Comes in premultiplied, because that's how this buffer stores it.
         this.px[o] = rgba[i] * a;
         this.px[o + 1] = rgba[i + 1] * a;
         this.px[o + 2] = rgba[i + 2] * a;
@@ -223,7 +224,7 @@ export class Canvas {
     const raw = Buffer.alloc(h * (w * ch + 1));
     let o = 0;
     for (let y = 0; y < h; y++) {
-      raw[o++] = 0; // byte de filtro por scanline: 0 = sin filtro
+      raw[o++] = 0; // per-scanline filter byte: 0 = no filter
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
         raw[o++] = rgba[i];
@@ -236,7 +237,7 @@ export class Canvas {
     const ihdr = Buffer.alloc(13);
     ihdr.writeUInt32BE(w, 0);
     ihdr.writeUInt32BE(h, 4);
-    ihdr[8] = 8; // bits por canal
+    ihdr[8] = 8; // bits per channel
     ihdr[9] = opaque ? 2 : 6; // 2 = RGB, 6 = RGBA
     return Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),

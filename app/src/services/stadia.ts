@@ -1,19 +1,19 @@
 /**
- * Cliente HTTP comun de Stadia Maps.
+ * Common HTTP client for Stadia Maps.
  *
- * NO lleva clave de API. Stadia autentica por dominio: valida las cabeceras
- * `Origin` y `Referer` que el navegador manda solo, asi que basta con dar de
- * alta el dominio en el panel de Stadia. Desde `localhost` funciona sin nada
- * (con limite de peticiones mas estricto).
+ * Carries NO API key. Stadia authenticates by domain: it validates the
+ * `Origin` and `Referer` headers that the browser sends on its own, so it's
+ * enough to register the domain in Stadia's panel. From `localhost` it works
+ * with nothing (with a stricter rate limit).
  *
- * Consecuencia importante: si alguna vez se pone `Referrer-Policy: no-referrer`
- * en el sitio, la autenticacion deja de funcionar.
+ * Important consequence: if `Referrer-Policy: no-referrer` is ever set on the
+ * site, authentication stops working.
  */
 
 const BASE = 'https://api.stadiamaps.com';
 const TIMEOUT_MS = 8_000;
 
-/** Error con un mensaje que la interfaz puede enseñar tal cual. */
+/** Error with a message the UI can show as-is. */
 export class StadiaError extends Error {
   constructor(
     message: string,
@@ -25,14 +25,14 @@ export class StadiaError extends Error {
 }
 
 /**
- * Combina el `signal` de quien llama con un limite de tiempo propio.
+ * Combines the caller's `signal` with a timeout of our own.
  *
- * Sin el limite, una peticion en una zona sin cobertura se queda colgada para
- * siempre y la interfaz se queda en "buscando..." indefinidamente.
+ * Without the timeout, a request in an area with no coverage hangs forever
+ * and the UI stays stuck on "searching..." indefinitely.
  */
 function abortable(external: AbortSignal | undefined, ms: number) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(new StadiaError('Tardo demasiado')), ms);
+  const timer = setTimeout(() => ctrl.abort(new StadiaError('Took too long')), ms);
   external?.addEventListener('abort', () => ctrl.abort(external.reason), { once: true });
   return { signal: ctrl.signal, done: () => clearTimeout(timer) };
 }
@@ -49,20 +49,20 @@ export async function stadiaGet<T>(
   try {
     const res = await fetch(url, { signal: merged });
     if (!res.ok) {
-      // 401/403 aqui casi siempre significa que falta dar de alta el dominio.
+      // A 401/403 here almost always means the domain isn't registered yet.
       const hint =
         res.status === 401 || res.status === 403
-          ? 'Dominio no autorizado en Stadia Maps'
+          ? 'Domain not authorized with Stadia Maps'
           : `Error ${res.status}`;
       throw new StadiaError(hint, res.status);
     }
     return (await res.json()) as T;
   } catch (err) {
     if (err instanceof StadiaError) throw err;
-    // Una cancelacion deliberada no es un fallo: se propaga tal cual para que
-    // quien llama la distinga (el autocompletado cancela sin parar).
+    // A deliberate cancellation is not a failure: it's propagated as-is so
+    // the caller can tell it apart (autocomplete cancels constantly).
     if (err instanceof DOMException && err.name === 'AbortError') throw err;
-    throw new StadiaError('Sin conexion');
+    throw new StadiaError('No connection');
   } finally {
     done();
   }

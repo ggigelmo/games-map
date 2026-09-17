@@ -2,37 +2,44 @@ import type { Point } from './geo-math';
 import { stadiaGet } from './stadia';
 
 /**
- * Una maniobra de la ruta. Valhalla ya redacta el texto para leerlo en voz
- * alta, en el idioma que se le pida; la fase 3 solo tendra que decidir CUANDO
- * pronunciarlo, no que decir.
+ * A route maneuver. Valhalla already drafts the text to be read aloud, in
+ * whatever language is requested; phase 3 will only need to decide WHEN to
+ * speak it, not what to say.
  */
 export interface Maneuver {
   instruction: string;
   /**
-   * Tipo de maniobra de Valhalla, un enum numerico: 15 izquierda, 10 derecha,
-   * 9 leve derecha, 16 leve izquierda, 26/27 rotonda, 1 salida, 6 destino...
-   * Se usa para elegir la flecha.
+   * Valhalla's maneuver type, a numeric enum: 15 left, 10 right,
+   * 9 slight right, 16 slight left, 26/27 roundabout, 1 exit, 6 destination...
+   * Used to pick the arrow.
    */
   type: number;
-  /** Calle(s) hacia las que gira. Puede venir vacio en enlaces y rotondas. */
+  /** Street(s) being turned onto. May be empty on ramps and roundabouts. */
   streetNames: string[];
-  /** Redactada para sintesis de voz, o undefined si Valhalla no la dio */
+  /** Drafted for speech synthesis, or undefined if Valhalla didn't provide it */
   verbal: string | undefined;
-  /** Aviso anticipado, mas corto. Lo usara la fase 3b. */
+  /** Shorter early warning. */
   verbalAlert: string | undefined;
-  /** indice dentro de `coordinates` donde empieza la maniobra */
+  /**
+   * Whether `verbal` already chains in the instruction for the NEXT maneuver
+   * (maneuvers that follow each other closely). When this is the case, that
+   * next maneuver's early warning is skipped: it was already said, and
+   * repeating it duplicates the instruction.
+   */
+  multiCue: boolean;
+  /** index within `coordinates` where the maneuver begins */
   beginIndex: number;
   lengthKm: number;
   timeS: number;
 }
 
 export interface Route {
-  /** [lng, lat][], listo para meter en un GeoJSON */
+  /** [lng, lat][], ready to drop into a GeoJSON */
   coordinates: [number, number][];
   distanceKm: number;
   durationS: number;
   maneuvers: Maneuver[];
-  /** [[oeste, sur], [este, norte]] */
+  /** [[west, south], [east, north]] */
   bounds: [[number, number], [number, number]];
 }
 
@@ -47,6 +54,7 @@ interface ValhallaResponse {
         street_names?: string[];
         verbal_pre_transition_instruction?: string;
         verbal_transition_alert_instruction?: string;
+        verbal_multi_cue?: boolean;
         begin_shape_index: number;
         length: number;
         time: number;
@@ -56,15 +64,15 @@ interface ValhallaResponse {
 }
 
 /**
- * Decodifica una polilinea codificada de Google/Valhalla.
+ * Decodes a Google/Valhalla encoded polyline.
  *
- * OJO CON `precision`: Valhalla usa **6**, no 5. Google Maps y casi todos los
- * ejemplos que se encuentran por ahi usan 5, y con 5 esto no falla, sino algo
- * peor: devuelve coordenadas de aspecto normal pero diez veces mas pequenas,
- * asi que la ruta aparece dibujada a cientos de kilometros del sitio. Por eso
- * esta funcion tiene un test.
+ * WATCH OUT FOR `precision`: Valhalla uses **6**, not 5. Google Maps and
+ * almost every example found out there uses 5, and with 5 this doesn't fail —
+ * something worse happens: it returns coordinates that look normal but are
+ * ten times too small, so the route ends up drawn hundreds of kilometers away
+ * from the actual place. That's why this function has a test.
  *
- * @returns pares [lng, lat] en orden GeoJSON, no [lat, lng]
+ * @returns [lng, lat] pairs in GeoJSON order, not [lat, lng]
  */
 export function decodePolyline(encoded: string, precision = 6): [number, number][] {
   const factor = 10 ** precision;
@@ -82,7 +90,7 @@ export function decodePolyline(encoded: string, precision = 6): [number, number]
       result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (byte >= 0x20);
-    // Bit bajo a 1 = negativo, en complemento a uno.
+    // Low bit set to 1 = negative, in one's complement.
     return result & 1 ? ~(result >> 1) : result >> 1;
   };
 
@@ -111,7 +119,7 @@ function boundsOf(coords: [number, number][]): Route['bounds'] {
   ];
 }
 
-/** Calcula una ruta en coche entre dos puntos. */
+/** Computes a driving route between two points. */
 export async function route(from: Point, to: Point, signal?: AbortSignal): Promise<Route> {
   const request = {
     locations: [
@@ -119,7 +127,7 @@ export async function route(from: Point, to: Point, signal?: AbortSignal): Promi
       { lat: to.lat, lon: to.lng },
     ],
     costing: 'auto',
-    directions_options: { language: 'es-ES', units: 'kilometers' },
+    directions_options: { language: 'en-US', units: 'kilometers' },
   };
 
   const data = await stadiaGet<ValhallaResponse>(
@@ -128,8 +136,9 @@ export async function route(from: Point, to: Point, signal?: AbortSignal): Promi
     signal,
   );
 
-  // Con dos puntos siempre hay un tramo, pero concatenar es igual de barato y
-  // deja la puerta abierta a paradas intermedias sin tocar nada.
+  // With two points there's always a single leg, but concatenating is just as
+  // cheap and leaves the door open for intermediate stops without touching
+  // anything.
   const coordinates: [number, number][] = [];
   const maneuvers: Maneuver[] = [];
   for (const leg of data.trip.legs) {
@@ -142,6 +151,7 @@ export async function route(from: Point, to: Point, signal?: AbortSignal): Promi
         streetNames: m.street_names ?? [],
         verbal: m.verbal_pre_transition_instruction,
         verbalAlert: m.verbal_transition_alert_instruction,
+        multiCue: m.verbal_multi_cue ?? false,
         beginIndex: offset + m.begin_shape_index,
         lengthKm: m.length,
         timeS: m.time,

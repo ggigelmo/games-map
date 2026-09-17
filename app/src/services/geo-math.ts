@@ -1,7 +1,7 @@
 /**
- * Matematicas geograficas. Logica pura y sin dependencias, para poder probarla
- * sin navegador. La fase 3 (snapToRoute, distancia a la siguiente maniobra)
- * se apoyara en esto.
+ * Geographic math. Pure logic with no dependencies, so it can be tested
+ * without a browser. Phase 3 (snapToRoute, distance to the next maneuver)
+ * will build on this.
  */
 
 export interface Point {
@@ -9,14 +9,14 @@ export interface Point {
   lat: number;
 }
 
-const R = 6_371_008.8; // radio medio terrestre en metros
+const R = 6_371_008.8; // mean Earth radius in meters
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /**
- * Distancia sobre la esfera entre dos puntos, en metros (haversine).
+ * Distance over the sphere between two points, in meters (haversine).
  *
- * Es de sobra para lo que hace esta app: a escala de ciudad el error frente a
- * un elipsoide esta por debajo del propio error del GPS.
+ * This is more than enough for what this app does: at city scale, the error
+ * versus an ellipsoid is below the GPS's own error margin.
  */
 export function distanceMeters(a: Point, b: Point): number {
   const dLat = rad(b.lat - a.lat);
@@ -27,11 +27,11 @@ export function distanceMeters(a: Point, b: Point): number {
   return 2 * R * Math.asin(Math.sqrt(s));
 }
 
-/** "850 m" / "12,4 km" — como lo escribiria un navegador en espanol. */
+/** "850 m" / "12.4 km" */
 export function formatDistance(meters: number): string {
   if (meters < 1000) return `${Math.round(meters / 10) * 10} m`;
   const km = meters / 1000;
-  return `${km < 10 ? km.toFixed(1).replace('.', ',') : Math.round(km)} km`;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
 }
 
 /** "7 min" / "1 h 12 min" */

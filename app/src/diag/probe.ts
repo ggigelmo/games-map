@@ -1,17 +1,17 @@
 /**
- * Panel de diagnostico. Existe para responder empiricamente a una pregunta:
- * ¿aguanta una PWA en iOS lo que necesita una app de navegacion?
+ * Diagnostics panel. Exists to answer one question empirically: can a PWA on
+ * iOS hold up to what a navigation app needs?
  *
- * Los tres riesgos conocidos que mide:
+ * The three known risks it measures:
  *
- *  1. "Ubicacion precisa" desactivada para Safari -> watchPosition devuelve
- *     precision de 3-9 km y solo refresca cada ~15 min. Inservible, y no da
- *     ningun error: simplemente miente. Se detecta por accuracy + intervalo.
- *  2. Bug historico en modo standalone: el dialogo de permiso de ubicacion no
- *     aparece y la llamada NO hace timeout nunca. Se detecta con un temporizador
- *     propio, porque el de la API no salta.
- *  3. Screen Wake Lock estuvo roto en PWAs instaladas hasta iOS 18.4. Sin el,
- *     la pantalla se apaga a mitad de trayecto.
+ *  1. "Precise Location" disabled for Safari -> watchPosition returns 3-9 km
+ *     accuracy and only refreshes every ~15 min. Useless, and it raises no
+ *     error: it just lies. Detected via accuracy + interval.
+ *  2. Historical bug in standalone mode: the location permission dialog
+ *     never appears and the call NEVER times out. Detected with a custom
+ *     timer, because the API's own doesn't fire.
+ *  3. Screen Wake Lock was broken in installed PWAs up through iOS 18.4.
+ *     Without it, the screen turns off mid-trip.
  */
 
 import type { Compass } from '../services/compass';
@@ -31,10 +31,10 @@ export interface Diagnostics {
 }
 
 /**
- * @param geo     dueno del watchPosition; este panel solo mide lo que sale de el
- * @param compass brujula; el permiso se concede desde aqui, porque iOS exige
- *                que la peticion salga de un gesto del usuario
- * @param awake   bloqueo de pantalla; este panel solo informa de que via usa
+ * @param geo     owner of watchPosition; this panel only reports what comes out of it
+ * @param compass compass; permission is requested from here, because iOS
+ *                requires the request to come from a user gesture
+ * @param awake   screen lock; this panel only reports which method is in use
  */
 export function mountDiagnostics(
   geo: GeoWatcher,
@@ -47,21 +47,21 @@ export function mountDiagnostics(
 
   const rows = new Map<string, Row>();
 
-  // Se declara aqui arriba porque render() lo reengancha en cada pintada, y
-  // render() ya corre desde el primer set(), antes de la seccion de voz.
-  const botones = document.createElement('div');
-  botones.className = 'row';
-  botones.style.marginTop = '10px';
+  // Declared up here because render() reattaches it on every paint, and
+  // render() already runs from the first set(), before the voice section.
+  const buttons = document.createElement('div');
+  buttons.className = 'row';
+  buttons.style.marginTop = '10px';
 
   const voiceBtn = document.createElement('button');
   voiceBtn.className = 'btn btn--ghost';
-  voiceBtn.textContent = 'Probar voz';
+  voiceBtn.textContent = 'Test voice';
 
   const compassBtn = document.createElement('button');
   compassBtn.className = 'btn btn--ghost';
-  compassBtn.textContent = 'Activar brujula';
+  compassBtn.textContent = 'Enable compass';
 
-  botones.append(voiceBtn, compassBtn);
+  buttons.append(voiceBtn, compassBtn);
 
   const set = (key: string, label: string, value: string, verdict: Verdict) => {
     rows.set(key, { label, value, verdict });
@@ -75,18 +75,18 @@ export function mountDiagnostics(
           `<dt>${r.label}</dt><dd class="${r.verdict === 'pending' ? '' : r.verdict}">${r.value}</dd>`,
       )
       .join('');
-    el.innerHTML = `<h2>Diagnostico del dispositivo</h2><dl>${items}</dl>`;
-    el.appendChild(botones);
+    el.innerHTML = `<h2>Device diagnostics</h2><dl>${items}</dl>`;
+    el.appendChild(buttons);
   }
 
-  // ------------------------------------------------------- entorno
+  // ------------------------------------------------------- environment
 
   const standalone =
     window.matchMedia('(display-mode: standalone)').matches ||
-    // Safari en iOS expone esto en vez de display-mode durante anos.
+    // Safari on iOS exposed this instead of display-mode for years.
     (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-  set('mode', 'Modo', standalone ? 'STANDALONE' : 'NAVEGADOR', standalone ? 'ok' : 'warn');
+  set('mode', 'Mode', standalone ? 'STANDALONE' : 'BROWSER', standalone ? 'ok' : 'warn');
 
   const ua = navigator.userAgent;
   const iosMatch = /OS (\d+)[._](\d+)/.exec(ua);
@@ -102,25 +102,25 @@ export function mountDiagnostics(
       wakeLockFixed ? 'ok' : 'warn',
     );
   } else {
-    set('ios', 'Plataforma', isIOS ? 'iOS (version ?)' : 'no iOS', 'warn');
+    set('ios', 'Platform', isIOS ? 'iOS (version ?)' : 'not iOS', 'warn');
   }
 
   set(
     'secure',
-    'Contexto seguro',
-    window.isSecureContext ? 'HTTPS' : 'INSEGURO',
+    'Secure context',
+    window.isSecureContext ? 'HTTPS' : 'INSECURE',
     window.isSecureContext ? 'ok' : 'bad',
   );
 
-  // ---------------------------------------------------- geolocalizacion
+  // ---------------------------------------------------- geolocation
   //
-  // El watcher ya no vive aqui: lo posee services/geolocation.ts, porque el
-  // routing tambien necesita la posicion y no puede depender de un panel de
-  // depuracion. Esto solo mide lo que sale de el.
+  // The watcher no longer lives here: services/geolocation.ts owns it,
+  // because routing also needs the position and can't depend on a debug
+  // panel. This only reports what comes out of it.
 
-  set('geo', 'GPS: primer fix', 'esperando...', 'pending');
-  set('acc', 'Precision', '-', 'pending');
-  set('rate', 'Intervalo entre fixes', '-', 'pending');
+  set('geo', 'GPS: first fix', 'waiting...', 'pending');
+  set('acc', 'Accuracy', '-', 'pending');
+  set('rate', 'Interval between fixes', '-', 'pending');
 
   let fixes = 0;
   let lastFixAt = 0;
@@ -132,14 +132,14 @@ export function mountDiagnostics(
     lastFixAt = fix.at;
 
     if (fixes === 1) {
-      set('geo', 'GPS: primer fix', `${Math.round(fix.at - geo.startedAt)} ms`, 'ok');
+      set('geo', 'GPS: first fix', `${Math.round(fix.at - geo.startedAt)} ms`, 'ok');
     }
 
     const acc = fix.accuracy;
-    // >500 m es la firma de "Ubicacion precisa" desactivada para Safari.
+    // >500 m is the signature of "Precise Location" disabled for Safari.
     set(
       'acc',
-      'Precision',
+      'Accuracy',
       `${acc < 1000 ? acc.toFixed(0) + ' m' : (acc / 1000).toFixed(1) + ' km'}  (${fixes} fix)`,
       acc <= 30 ? 'ok' : acc <= 200 ? 'warn' : 'bad',
     );
@@ -148,7 +148,7 @@ export function mountDiagnostics(
       const med = [...intervals].sort((a, b) => a - b)[intervals.length >> 1]!;
       set(
         'rate',
-        'Intervalo entre fixes',
+        'Interval between fixes',
         med < 1000 ? `${med.toFixed(0)} ms` : `${(med / 1000).toFixed(1)} s`,
         med <= 5000 ? 'ok' : med <= 30_000 ? 'warn' : 'bad',
       );
@@ -156,103 +156,104 @@ export function mountDiagnostics(
   });
 
   geo.onFailure((f) => {
-    const texto =
+    const text =
       f.kind === 'unsupported'
-        ? 'NO SOPORTADO'
+        ? 'NOT SUPPORTED'
         : f.kind === 'silent'
-          ? 'SIN RESPUESTA'
+          ? 'NO RESPONSE'
           : f.message;
-    set('geo', 'GPS: primer fix', texto, 'bad');
-    if (f.kind === 'silent') set('acc', 'Precision', 'permiso nunca resuelto', 'bad');
+    set('geo', 'GPS: first fix', text, 'bad');
+    if (f.kind === 'silent') set('acc', 'Accuracy', 'permission never resolved', 'bad');
   });
 
-  // -------------------------------------------------- pantalla encendida
+  // -------------------------------------------------- screen wake lock
   //
-  // Este panel ya NO pide el bloqueo: lo posee services/keep-awake.ts. Antes lo
-  // pedia por su cuenta, compitiendo con el de main.ts por el mismo recurso.
-  // Aqui solo se informa de que via esta funcionando, que es el dato que
-  // faltaba para poder diagnosticarlo sin adivinar.
+  // This panel no longer requests the lock itself: services/keep-awake.ts
+  // owns it. It used to request it on its own, competing with main.ts for
+  // the same resource. Here it only reports which method is working, which
+  // is the piece of data that was missing to diagnose it without guessing.
 
-  const pintarAwake = (m: KeepAwakeMethod) =>
+  const paintAwake = (m: KeepAwakeMethod) =>
     set(
       'wake',
-      'Pantalla encendida',
-      m === 'API' ? 'API NATIVA' : m === 'VIDEO' ? 'VIDEO (respaldo)' : 'NO ACTIVA',
-      m === 'NINGUNO' ? 'bad' : 'ok',
+      'Screen wake lock',
+      m === 'API' ? 'NATIVE API' : m === 'VIDEO' ? 'VIDEO (fallback)' : 'NOT ACTIVE',
+      m === 'NONE' ? 'bad' : 'ok',
     );
 
-  pintarAwake(awake.method);
-  awake.onChange = pintarAwake;
+  paintAwake(awake.method);
+  awake.onChange = paintAwake;
 
-  // ------------------------------------------------------------- voz
+  // ------------------------------------------------------------- voice
 
   if (!('speechSynthesis' in window)) {
-    set('tts', 'Sintesis de voz', 'NO SOPORTADO', 'bad');
+    set('tts', 'Speech synthesis', 'NOT SUPPORTED', 'bad');
     voiceBtn.disabled = true;
   } else {
     const countVoices = () => {
       const all = speechSynthesis.getVoices();
-      const es = all.filter((v) => v.lang.startsWith('es'));
+      const en = all.filter((v) => v.lang.startsWith('en'));
       set(
         'tts',
-        'Voces (es / total)',
-        `${es.length} / ${all.length}`,
-        es.length > 0 ? 'ok' : all.length > 0 ? 'warn' : 'pending',
+        'Voices (en / total)',
+        `${en.length} / ${all.length}`,
+        en.length > 0 ? 'ok' : all.length > 0 ? 'warn' : 'pending',
       );
     };
     countVoices();
-    // En iOS la lista llega asincrona, a veces solo tras el primer speak().
+    // On iOS the list arrives asynchronously, sometimes only after the first speak().
     speechSynthesis.addEventListener('voiceschanged', countVoices);
 
-    // iOS exige que el PRIMER speak() venga de un gesto del usuario.
-    // Por eso esto es un boton y no una prueba automatica.
+    // iOS requires the FIRST speak() to come from a user gesture.
+    // That's why this is a button and not an automatic test.
     voiceBtn.addEventListener('click', () => {
-      const u = new SpeechSynthesisUtterance('En doscientos metros, gire a la derecha.');
-      u.lang = 'es-ES';
-      u.onstart = () => set('ttsplay', 'Reproduccion de voz', 'SUENA', 'ok');
-      u.onerror = (e) => set('ttsplay', 'Reproduccion de voz', `ERROR: ${e.error}`, 'bad');
+      const u = new SpeechSynthesisUtterance('In two hundred meters, turn right.');
+      u.lang = 'en-US';
+      u.onstart = () => set('ttsplay', 'Voice playback', 'PLAYING', 'ok');
+      u.onerror = (e) => set('ttsplay', 'Voice playback', `ERROR: ${e.error}`, 'bad');
       speechSynthesis.speak(u);
       countVoices();
     });
   }
 
-  // ---------------------------------------------------- brujula
+  // ---------------------------------------------------- compass
   //
-  // El GPS solo sabe tu rumbo cuando te MUEVES. Parado, la brujula es lo unico
-  // que dice hacia donde miras. En iOS hace falta permiso explicito pedido
-  // desde un gesto del usuario: de ahi que esto sea un boton y no automatico.
+  // The GPS only knows your heading while you're MOVING. Stopped, the
+  // compass is the only thing that says which way you're facing. iOS
+  // requires explicit permission requested from a user gesture: hence this
+  // is a button and not automatic.
 
   if (!compass.supported) {
-    set('compass', 'Brujula', 'NO SOPORTADA', 'warn');
+    set('compass', 'Compass', 'NOT SUPPORTED', 'warn');
     compassBtn.disabled = true;
   } else {
     set(
       'compass',
-      'Brujula',
-      compass.needsPermission ? 'pulsa para activar' : 'disponible',
+      'Compass',
+      compass.needsPermission ? 'tap to enable' : 'available',
       'pending',
     );
 
     compassBtn.addEventListener('click', async () => {
       compassBtn.disabled = true;
-      const resultado = await compass.enable();
-      if (resultado === 'granted') {
-        set('compass', 'Brujula', 'ACTIVA', 'ok');
-        compassBtn.textContent = 'Brujula activa';
+      const result = await compass.enable();
+      if (result === 'granted') {
+        set('compass', 'Compass', 'ACTIVE', 'ok');
+        compassBtn.textContent = 'Compass active';
       } else {
         compassBtn.disabled = false;
         set(
           'compass',
-          'Brujula',
-          resultado === 'denied' ? 'PERMISO DENEGADO' : 'NO SOPORTADA',
+          'Compass',
+          result === 'denied' ? 'PERMISSION DENIED' : 'NOT SUPPORTED',
           'bad',
         );
       }
     });
 
-    // El rumbo en vivo es lo que demuestra que funciona de verdad, en vez de
-    // limitarse a decir que el permiso se concedio.
-    compass.onHeading((deg) => set('heading', 'Rumbo brujula', `${Math.round(deg)}°`, 'ok'));
+    // Live heading is what proves it actually works, rather than just
+    // saying permission was granted.
+    compass.onHeading((deg) => set('heading', 'Compass heading', `${Math.round(deg)}°`, 'ok'));
   }
 
   render();

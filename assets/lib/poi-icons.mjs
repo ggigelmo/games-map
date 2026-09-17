@@ -1,17 +1,17 @@
 /**
- * Iconos de POI y su asignacion por tipo de establecimiento.
+ * POI icons and their assignment by business type.
  *
- * Fuente unica de verdad: assets/make-sprite.mjs dibuja estos glifos en el
- * sprite, y style/build.mjs importa CLASS_TO_ICON para construir la expresion
- * `icon-image`. Si estuvieran en dos sitios, un icono nuevo se dibujaria sin
- * que ningun POI lo usara, o al contrario.
+ * Single source of truth: assets/make-sprite.mjs draws these glyphs into the
+ * sprite, and style/build.mjs imports CLASS_TO_ICON to build the
+ * `icon-image` expression. If they lived in two places, a new icon could get
+ * drawn with no POI using it, or the other way around.
  *
- * Los glifos son originales, dibujados en el lenguaje visual de Cyberpunk 2077
- * (placa de esquinas cortadas, borde cian, glifo grueso con halo). NO son los
- * assets del juego, que son propiedad de CD Projekt Red.
+ * The glyphs are original, drawn in the visual language of Cyberpunk 2077
+ * (chamfered-corner plate, cyan border, thick glyph with halo). They are NOT
+ * the game's own assets, which are property of CD Projekt Red.
  *
- * Las etiquetas son valores de `class` de la capa `poi` del esquema
- * OpenMapTiles, que es lo que sirven las teselas.
+ * The labels are `class` values from the `poi` layer of the OpenMapTiles
+ * schema, which is what the tiles serve.
  */
 import { chamfered, hex, rect } from './raster.mjs';
 
@@ -22,11 +22,12 @@ export const CYAN = hex('#22f4ff');
 export const DIM = hex('#4d8fa0');
 
 /**
- * Cada glifo se dibuja en una caja logica de 24x24. El generador ya ha pintado
- * la placa y el borde antes de llamar; aqui solo va el simbolo.
+ * Each glyph is drawn in a logical 24x24 box. The generator has already
+ * painted the plate and the border before calling this; only the symbol goes
+ * here.
  */
 export const ICONS = {
-  // --- comida: vaso de fideos con palillos, la comida callejera de Night City
+  // --- food: cup of noodles with chopsticks, Night City's street food
   food: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -37,7 +38,7 @@ export const ICONS = {
     },
   },
 
-  // --- bar: copa de martini
+  // --- bar: martini glass
   bar: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -47,7 +48,7 @@ export const ICONS = {
     },
   },
 
-  // --- medpoint: cruz con halo
+  // --- medpoint: cross with halo
   medpoint: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -56,7 +57,7 @@ export const ICONS = {
     },
   },
 
-  // --- fast travel: flecha sobre plataforma
+  // --- fast travel: arrow over a platform
   fastTravel: {
     tint: CYAN,
     draw: (c, k) => {
@@ -66,7 +67,7 @@ export const ICONS = {
     },
   },
 
-  // --- landmark: rombo con nucleo
+  // --- landmark: diamond with a core
   landmark: {
     tint: CYAN,
     draw: (c, k) => {
@@ -78,7 +79,7 @@ export const ICONS = {
     },
   },
 
-  // --- junk shop: caja de carga
+  // --- junk shop: cargo crate
   junk: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -88,7 +89,7 @@ export const ICONS = {
     },
   },
 
-  // --- ropa: camiseta
+  // --- clothes: t-shirt
   clothes: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -102,7 +103,7 @@ export const ICONS = {
     },
   },
 
-  // --- eddies: chip de credito
+  // --- eddies: credit chip
   eddies: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -112,7 +113,7 @@ export const ICONS = {
     },
   },
 
-  // --- NCPD: escudo con galon
+  // --- NCPD: shield with chevron
   ncpd: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -124,7 +125,7 @@ export const ICONS = {
     },
   },
 
-  // --- vehiculos y combustible
+  // --- vehicles and fuel
   vehicle: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -137,7 +138,7 @@ export const ICONS = {
     },
   },
 
-  // --- motel: cama
+  // --- motel: bed
   hotel: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -147,7 +148,7 @@ export const ICONS = {
     },
   },
 
-  // --- ocio: play entre corchete
+  // --- entertainment: play button between brackets
   entertainment: {
     tint: YELLOW,
     draw: (c, k) => {
@@ -156,7 +157,7 @@ export const ICONS = {
     },
   },
 
-  // --- corpo: dos torres
+  // --- corpo: two towers
   corpo: {
     tint: DIM,
     draw: (c, k) => {
@@ -165,8 +166,8 @@ export const ICONS = {
     },
   },
 
-  // --- verde: conifera de dos pisos. Con un solo triangulo y tronco se leia
-  // como una flecha hacia arriba, que ya es el icono de fast travel.
+  // --- nature: two-tiered conifer. With just one triangle and a trunk it
+  // read as an upward arrow, which is already the fast-travel icon.
   nature: {
     tint: DIM,
     draw: (c, k) => {
@@ -176,7 +177,7 @@ export const ICONS = {
     },
   },
 
-  // --- generico
+  // --- generic
   generic: {
     tint: DIM,
     draw: (c, k) => {
@@ -189,9 +190,10 @@ export const ICONS = {
 };
 
 /**
- * Que tipos de establecimiento llevan cada icono. Las etiquetas son valores de
- * `class` del esquema OpenMapTiles; algunas no existen en el esquema actual y
- * estan por si aparecen (sobran sin coste en una expresion `match`).
+ * Which business types carry each icon. The labels are `class` values from
+ * the OpenMapTiles schema; some don't exist in the current schema and are
+ * kept in case they show up (they cost nothing extra in a `match`
+ * expression).
  */
 const MEMBERS = {
   food: [
@@ -239,19 +241,19 @@ const MEMBERS = {
   ],
 };
 
-/** Icono usado cuando el `class` no esta en ninguna lista. */
+/** Icon used when the `class` is not in any list. */
 export const FALLBACK_ICON = 'generic';
 
-/** `class` de OpenMapTiles -> id de icono. */
+/** OpenMapTiles `class` -> icon id. */
 export const CLASS_TO_ICON = (() => {
   const map = new Map();
   for (const [icon, classes] of Object.entries(MEMBERS)) {
-    if (!ICONS[icon]) throw new Error(`MEMBERS apunta a un icono que no existe: ${icon}`);
+    if (!ICONS[icon]) throw new Error(`MEMBERS points to an icon that does not exist: ${icon}`);
     for (const cls of classes) {
-      // Una expresion `match` de MapLibre rechaza etiquetas repetidas, asi que
-      // un duplicado aqui romperia el estilo entero en tiempo de carga.
+      // A MapLibre `match` expression rejects repeated labels, so a duplicate
+      // here would break the whole style at load time.
       if (map.has(cls)) {
-        throw new Error(`la clase "${cls}" esta en ${map.get(cls)} y en ${icon}`);
+        throw new Error(`class "${cls}" is in both ${map.get(cls)} and ${icon}`);
       }
       map.set(cls, icon);
     }
@@ -259,5 +261,5 @@ export const CLASS_TO_ICON = (() => {
   return map;
 })();
 
-/** Nombre de la imagen dentro del sprite. */
+/** Name of the image inside the sprite. */
 export const spriteName = (icon) => `poi-${icon}`;

@@ -8,40 +8,41 @@ import {
 } from './heading';
 
 describe('gpsHeadingUsable', () => {
-  it('rechaza el rumbo cuando estas parado', () => {
-    // Es el caso que motiva la brujula: parado, coords.heading llega a null o
-    // con un valor cualquiera, y el mapa se quedaba clavado al norte.
+  it('rejects the heading when stopped', () => {
+    // This is the case that motivates the compass: stopped, coords.heading
+    // comes in as null or some arbitrary value, and the map used to stay
+    // stuck pointing north.
     expect(gpsHeadingUsable(null, 0)).toBe(false);
     expect(gpsHeadingUsable(90, 0)).toBe(false);
     expect(gpsHeadingUsable(90, null)).toBe(false);
   });
 
-  it('rechaza el rumbo andando despacio', () => {
+  it('rejects the heading when walking slowly', () => {
     expect(gpsHeadingUsable(90, 1.0)).toBe(false);
   });
 
-  it('lo acepta en marcha', () => {
+  it('accepts it while moving', () => {
     expect(gpsHeadingUsable(90, GPS_HEADING_MIN_SPEED)).toBe(true);
     expect(gpsHeadingUsable(200, 12)).toBe(true);
   });
 
-  it('rechaza un rumbo NaN aunque vayas rapido', () => {
+  it('rejects a NaN heading even when moving fast', () => {
     expect(gpsHeadingUsable(Number.NaN, 20)).toBe(false);
   });
 });
 
 describe('compassWins', () => {
-  it('cede el mando al GPS mientras dura su prioridad', () => {
-    const ahora = 10_000;
-    expect(compassWins(ahora, ahora + GPS_HEADING_TTL_MS)).toBe(false);
+  it('yields control to the GPS while its priority lasts', () => {
+    const now = 10_000;
+    expect(compassWins(now, now + GPS_HEADING_TTL_MS)).toBe(false);
   });
 
-  it('recupera el mando cuando el GPS caduca', () => {
-    const ahora = 10_000;
-    expect(compassWins(ahora, ahora - 1)).toBe(true);
+  it('regains control when the GPS expires', () => {
+    const now = 10_000;
+    expect(compassWins(now, now - 1)).toBe(true);
   });
 
-  it('manda desde el principio si el GPS nunca dio rumbo', () => {
+  it('has control from the start if the GPS never gave a heading', () => {
     expect(compassWins(performance.now(), 0)).toBe(true);
   });
 });

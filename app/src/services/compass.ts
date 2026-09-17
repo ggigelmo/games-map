@@ -1,25 +1,26 @@
 /**
- * Brujula del dispositivo.
+ * Device compass.
  *
- * Existe porque el GPS solo sabe tu rumbo cuando te MUEVES: parado o andando
- * despacio, `coords.heading` viene a null y el mapa se queda mirando al norte.
- * La brujula dice hacia donde apuntas aunque estes quieto.
+ * It exists because GPS only knows your heading when you're MOVING: stopped
+ * or walking slowly, `coords.heading` comes back null and the map is left
+ * facing north. The compass tells you which way you're pointing even while
+ * standing still.
  *
- * En marcha manda el GPS, no esto: con el movil en un soporte, la orientacion
- * del aparato no tiene por que coincidir con la direccion del coche. Quien
- * decide cual usar es MapView.
+ * While moving, the GPS is in charge, not this: with the phone in a mount,
+ * the device's orientation doesn't necessarily match the car's direction.
+ * MapView is the one that decides which to use.
  */
 
-/** Grados de cambio por debajo de los cuales se ignora la lectura. */
+/** Degrees of change below which the reading is ignored. */
 const DEADBAND_DEG = 2;
 
-/** La brujula dispara decenas de veces por segundo; con esto basta de sobra. */
+/** The compass fires dozens of times per second; this is more than enough. */
 const THROTTLE_MS = 100;
 
 type PermissionResult = 'granted' | 'denied' | 'unsupported';
 
 interface IOSDeviceOrientationEvent extends DeviceOrientationEvent {
-  /** Solo en iOS: rumbo respecto al norte, horario. Ya viene listo. */
+  /** iOS only: heading relative to north, clockwise. Already comes ready to use. */
   webkitCompassHeading?: number;
 }
 
@@ -32,15 +33,16 @@ export class Compass {
   private listening = false;
   private lastEmit = 0;
 
-  /** Ultimo rumbo conocido en grados (0 = norte), o null. */
+  /** Last known heading in degrees (0 = north), or null. */
   heading: number | null = null;
 
-  /** Si el navegador expone el evento siquiera. */
+  /** Whether the browser even exposes the event. */
   readonly supported = typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
 
   /**
-   * iOS exige pedir permiso explicitamente, y solo desde un gesto del usuario.
-   * En Android y escritorio el evento llega sin pedir nada.
+   * iOS requires explicitly requesting permission, and only from a user
+   * gesture. On Android and desktop the event arrives without asking for
+   * anything.
    */
   readonly needsPermission =
     this.supported && typeof (window.DeviceOrientationEvent as OrientationCtor).requestPermission === 'function';
@@ -51,8 +53,8 @@ export class Compass {
   }
 
   /**
-   * Pide permiso y arranca. DEBE llamarse desde un manejador de click o iOS lo
-   * rechaza sin preguntar siquiera.
+   * Requests permission and starts. MUST be called from a click handler or
+   * iOS rejects it without even asking.
    */
   async enable(): Promise<PermissionResult> {
     if (!this.supported) return 'unsupported';
@@ -63,7 +65,7 @@ export class Compass {
         const answer = await ctor.requestPermission!();
         if (answer !== 'granted') return 'denied';
       } catch {
-        // Lanza si no viene de un gesto del usuario.
+        // Throws if it doesn't come from a user gesture.
         return 'denied';
       }
     }
@@ -88,17 +90,17 @@ export class Compass {
 
     let deg: number | null = null;
     if (typeof e.webkitCompassHeading === 'number' && !Number.isNaN(e.webkitCompassHeading)) {
-      // iOS ya lo da como rumbo de brujula.
+      // iOS already gives it as a compass heading.
       deg = e.webkitCompassHeading;
     } else if (e.absolute && e.alpha !== null) {
-      // El estandar mide alpha en sentido ANTIhorario desde el norte, asi que
-      // hay que darle la vuelta para tener un rumbo de brujula.
+      // The standard measures alpha COUNTERclockwise from north, so it has
+      // to be flipped to get a compass heading.
       deg = (360 - e.alpha) % 360;
     }
     if (deg === null || Number.isNaN(deg)) return;
 
-    // Banda muerta: sin esto, el ruido del magnetometro hace vibrar el mapa
-    // aunque tengas el movil quieto encima de la mesa.
+    // Deadband: without this, magnetometer noise makes the map jitter even
+    // with the phone sitting still on a table.
     if (this.heading !== null && angleDelta(this.heading, deg) < DEADBAND_DEG) return;
 
     const now = performance.now();
@@ -111,11 +113,11 @@ export class Compass {
 }
 
 /**
- * Diferencia angular mas corta entre dos rumbos, en grados (0..180).
+ * Shortest angular difference between two headings, in degrees (0..180).
  *
- * Lo importante es que cruce bien el norte: de 350 a 10 son 20 grados, no 340.
- * El doble modulo es para que funcione tambien con diferencias negativas, que
- * el `%` de JavaScript no normaliza.
+ * The important part is that it correctly wraps around north: from 350 to 10
+ * is 20 degrees, not 340. The double modulo is so it also works with negative
+ * differences, which JavaScript's `%` doesn't normalize.
  */
 export function angleDelta(a: number, b: number): number {
   const d = ((((b - a) % 360) + 360) % 360);

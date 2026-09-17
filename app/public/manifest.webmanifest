@@ -1,7 +1,7 @@
 {
   "name": "Night City Maps",
   "short_name": "NIGHT CITY",
-  "description": "Navegacion con estetica Cyberpunk 2077",
+  "description": "Navigation with Cyberpunk 2077 aesthetics",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -7,16 +7,16 @@ const here = dirname(fileURLToPath(import.meta.url));
 const BUILDER = resolve(here, '../style/build.mjs');
 
 /**
- * Re-ejecuta style/build.mjs cuando cambia, de modo que editar la paleta
- * regenera cyberpunk.json y el HMR de Vite recarga el estilo en el mapa.
- * Un solo `npm run dev` y cero dependencias extra.
+ * Re-runs style/build.mjs when it changes, so editing the palette
+ * regenerates cyberpunk.json and Vite's HMR reloads the style on the map.
+ * A single `npm run dev` and zero extra dependencies.
  */
 function styleBuilder(): Plugin {
   const run = () => {
     try {
       execFileSync(process.execPath, [BUILDER], { stdio: 'inherit' });
     } catch {
-      // El error ya se imprimio por stdio; no tumbamos el dev server.
+      // The error was already printed via stdio; don't crash the dev server.
     }
   };
   return {
@@ -33,11 +33,10 @@ function styleBuilder(): Plugin {
 
 export default defineConfig({
   plugins: [styleBuilder()],
-  // El estilo canonico vive en ../style, fuera de la raiz de Vite.
   server: {
-    // El estilo canonico vive en ../style, fuera de la raiz de Vite.
+    // The canonical style lives in ../style, outside Vite's root.
     fs: { allow: [resolve(here, '..')] },
-    // Sin fijarlo a fuego: 5173 choca con otros proyectos que ya lo usan.
+    // Not hardcoded: 5173 collides with other projects that already use it.
     port: Number(process.env.PORT) || 5173,
   },
 });

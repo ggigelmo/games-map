@@ -1,9 +1,10 @@
 /**
- * Genera los iconos PNG de la PWA.
+ * Generates the PWA's PNG icons.
  *
- * iOS usa apple-touch-icon, que tiene que ser PNG (no acepta SVG). Sin el, al
- * anadir la app a la pantalla de inicio Safari pone una captura de la pagina,
- * que se ve fatal. De ahi que esto exista.
+ * iOS uses apple-touch-icon, which has to be a PNG (it doesn't accept SVG).
+ * Without it, adding the app to the home screen makes Safari use a
+ * screenshot of the page instead, which looks terrible. That's why this
+ * exists.
  *
  *   node assets/make-icons.mjs
  */
@@ -23,20 +24,20 @@ const CYAN_DIM = hex('#0e5f6e');
 const CORE = hex('#fdf7a0');
 
 /**
- * Un fragmento de mapa: autovia amarilla en diagonal con halo, una avenida
- * cian cruzandola, la reticula de calles menores al fondo, y el chevron del
- * jugador encima. Mismo dibujo que el marcador del mapa, para que el icono y
- * la app se reconozcan como lo mismo.
+ * A fragment of the map: a diagonal yellow highway with a halo, a cyan
+ * avenue crossing it, the grid of minor streets in the background, and the
+ * player's chevron on top. Same drawing as the map marker, so the icon and
+ * the app are recognized as the same thing.
  *
- * Se compone en unidades de 512 y se escala, asi que el diseno no depende del
- * tamano de salida.
+ * It's composed in 512 units and then scaled, so the design doesn't depend
+ * on the output size.
  */
 function draw(size) {
   const c = new Canvas(size, size, SS);
   const u = size / 512;
   c.fillAll(BG, 1);
 
-  // Reticula de fondo
+  // Background grid
   for (const [x0, y0, x1, y1] of [
     [0, 150, 512, 96],
     [0, 400, 512, 352],
@@ -46,15 +47,15 @@ function draw(size) {
     c.segment(x0 * u, y0 * u, x1 * u, y1 * u, 7 * u, CYAN_DIM, { glow: 6 * u });
   }
 
-  // Avenida
+  // Avenue
   c.segment(0, 300 * u, 512 * u, 210 * u, 14 * u, CYAN, { glow: 26 * u });
 
-  // Autovia: halo ancho y luego nucleo caliente. El mismo truco de dos pasadas
-  // que usa el estilo del mapa para las carreteras.
+  // Highway: wide halo, then a hot core. The same two-pass trick the map
+  // style uses for roads.
   c.segment(60 * u, 500 * u, 452 * u, 40 * u, 34 * u, YELLOW, { glow: 54 * u });
   c.segment(60 * u, 500 * u, 452 * u, 40 * u, 13 * u, CORE);
 
-  // Chevron del jugador
+  // Player's chevron
   const cx = 256 * u;
   const cy = 268 * u;
   const s = 92 * u;
@@ -67,7 +68,7 @@ function draw(size) {
   c.polyline(chevron, 3 * u, CYAN, { close: true, glow: 22 * u });
   c.polygon(chevron, CYAN);
 
-  // Los iconos de pantalla de inicio no llevan transparencia: PNG RGB.
+  // Home-screen icons don't carry transparency: PNG RGB.
   return c.toPNG({ opaque: true });
 }
 

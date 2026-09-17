@@ -1,15 +1,16 @@
 /**
- * Genera el sprite de POI que consume MapLibre.
+ * Generates the POI sprite that MapLibre consumes.
  *
  *   node assets/make-sprite.mjs
  *
- * Salida en app/public/sprites/:
+ * Output in app/public/sprites/:
  *   night-city.png      night-city.json       (pixelRatio 1)
  *   night-city@2x.png   night-city@2x.json    (pixelRatio 2)
  *
- * MapLibre pide `{sprite}.json` + `{sprite}.png`, y anade el sufijo `@2x`
- * cuando devicePixelRatio > 1 (o sea: siempre, en un iPhone). Sin la variante
- * @2x los iconos se ven borrosos en el movil, que es justo donde importa.
+ * MapLibre requests `{sprite}.json` + `{sprite}.png`, and adds the `@2x`
+ * suffix when devicePixelRatio > 1 (i.e. always, on an iPhone). Without the
+ * @2x variant the icons look blurry on mobile, which is exactly where it
+ * matters.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -19,28 +20,28 @@ import { Canvas, chamfered } from './lib/raster.mjs';
 import { ICONS, PLATE, BORDER, spriteName } from './lib/poi-icons.mjs';
 
 const OUT_DIR = join(dirname(fileURLToPath(import.meta.url)), '../app/public/sprites');
-const BASE = 24; // lado del icono en unidades logicas
-const PAD = 2; // separacion, para que el halo de un icono no sangre al vecino
+const BASE = 24; // icon side in logical units
+const PAD = 2; // spacing, so one icon's halo doesn't bleed into its neighbor
 const COLS = 5;
-const SS = 4; // supermuestreo al dibujar cada glifo
+const SS = 4; // supersampling while drawing each glyph
 
-/** Dibuja un icono completo (placa + borde + glifo) a `size` px. */
+/** Draws a full icon (plate + border + glyph) at `size` px. */
 function renderIcon(def, size) {
   const c = new Canvas(size, size, SS);
-  const k = size / BASE; // de unidades logicas a px de este tamano
+  const k = size / BASE; // from logical units to px at this size
 
-  // La placa oscura es lo que hace legible el glifo sobre un mapa negro con
-  // carreteras de neon cruzando por debajo.
+  // The dark plate is what makes the glyph legible over a black map with
+  // neon roads crossing underneath.
   const plate = chamfered(1.5 * k, 1.5 * k, 22.5 * k, 22.5 * k, 5.5 * k);
   c.polygon(plate, PLATE, { alpha: 0.86 });
   c.polyline(plate, 1.1 * k, BORDER, { close: true, alpha: 0.85, glow: 1.6 * k });
 
-  // El glifo se dibuja en coordenadas 0..24; se escalan envolviendo el lienzo.
+  // The glyph is drawn in 0..24 coordinates; they get scaled by wrapping the canvas.
   def.draw(scaled(c, k), def.tint);
   return c;
 }
 
-/** Envoltorio que multiplica por `k` las coordenadas de las primitivas. */
+/** Wrapper that multiplies primitive coordinates by `k`. */
 function scaled(c, k) {
   const pts = (arr) => arr.map(([x, y]) => [x * k, y * k]);
   return {
@@ -54,7 +55,7 @@ function scaled(c, k) {
 
 const scaleOpts = (o, k) => (o.glow ? { ...o, glow: o.glow * k } : o);
 
-/** Empaqueta todos los iconos en una hoja y devuelve {png, index}. */
+/** Packs all the icons into one sheet and returns {png, index}. */
 function buildSheet(pixelRatio) {
   const size = BASE * pixelRatio;
   const cell = size + PAD;
@@ -88,5 +89,5 @@ for (const [ratio, suffix] of [
   const { png, index, w, h, count } = buildSheet(ratio);
   writeFileSync(join(OUT_DIR, `night-city${suffix}.png`), png);
   writeFileSync(join(OUT_DIR, `night-city${suffix}.json`), JSON.stringify(index, null, 2) + '\n');
-  console.log(`ok  night-city${suffix}  ${w}x${h}px  ${count} iconos  ${png.length} bytes`);
+  console.log(`ok  night-city${suffix}  ${w}x${h}px  ${count} icons  ${png.length} bytes`);
 }

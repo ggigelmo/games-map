@@ -1,14 +1,14 @@
 import { distanceMeters, type Point } from './geo-math';
 import { stadiaGet } from './stadia';
 
-/** Un resultado de busqueda, ya masticado para la interfaz. */
+/** A search result, already massaged for the UI. */
 export interface Place {
   id: string;
-  /** "Gran Via, Madrid, Espana" */
+  /** "Gran Via, Madrid, Spain" */
   label: string;
   lng: number;
   lat: number;
-  /** metros desde donde estas, o null si aun no hay posicion */
+  /** meters from where you are, or null if there's no position yet */
   distanceM: number | null;
 }
 
@@ -19,18 +19,19 @@ interface PeliasResponse {
   }[];
 }
 
-/** Por debajo de esto los resultados son ruido y gastan peticiones. */
+/** Below this, results are just noise and waste requests. */
 export const MIN_QUERY_LENGTH = 3;
 
 /**
- * Autocompletado de destinos.
+ * Destination autocomplete.
  *
- * `near` sesga los resultados hacia donde estas: sin eso, buscar "gran via"
- * devuelve calles con ese nombre de todo el pais en vez de la de tu ciudad.
+ * `near` biases results toward where you are: without it, searching "gran
+ * via" returns streets with that name from the whole country instead of the
+ * one in your city.
  *
- * El `signal` es imprescindible, no un adorno: quien llama debe cancelar la
- * peticion anterior en cada pulsacion. Si no, las respuestas llegan
- * desordenadas y la lista parpadea mostrando resultados de consultas viejas.
+ * The `signal` is essential, not decoration: the caller must cancel the
+ * previous request on every keystroke. Otherwise responses arrive out of
+ * order and the list flickers showing results from stale queries.
  */
 export async function autocomplete(
   text: string,
@@ -39,7 +40,7 @@ export async function autocomplete(
 ): Promise<Place[]> {
   const params: Record<string, string | number> = {
     text,
-    lang: 'es',
+    lang: 'en',
     size: 8,
   };
   if (near) {
@@ -53,7 +54,7 @@ export async function autocomplete(
     const [lng, lat] = f.geometry.coordinates;
     return {
       id: f.properties.gid ?? `${lng},${lat},${i}`,
-      label: f.properties.label ?? f.properties.name ?? 'Sin nombre',
+      label: f.properties.label ?? f.properties.name ?? 'No name',
       lng,
       lat,
       distanceM: near ? distanceMeters(near, { lng, lat }) : null,

@@ -1,280 +1,290 @@
 # Cyberpunk Maps
 
-Navegador GPS con la estética Cyberpunk.
+GPS navigator with a Cyberpunk aesthetic.
 
-Es una **PWA**: se despliega como web y se añade a la pantalla de inicio del
-iPhone, donde arranca a pantalla completa sin barra de Safari. Sin App Store,
-sin Apple Developer Program y sin Mac.
+It's a **PWA**: deployed as a website and added to the iPhone home screen,
+where it launches fullscreen with no Safari bar. No App Store, no Apple
+Developer Program, and no Mac.
 
-En producción: <https://games-map.ggigelmo.workers.dev>
+In production: <https://games-map.ggigelmo.workers.dev>
 
-## Qué hace
+## What it does
 
-**Mapa y posición**
+**Map and position**
 
-- Mapa de teselas vectoriales con estilo propio: fondo negro azulado, carreteras
-  en amarillo y cian con halo de neón, edificios extruidos en rojo.
-- Iconos de POI según el tipo de establecimiento (130 categorías mapeadas).
-- La cámara te sigue y **gira con tu rumbo**. En marcha manda el GPS; parado,
-  la brújula del móvil, porque `coords.heading` llega a `null` sin movimiento.
-- HUD con velocímetro, rumbo, precisión y posición.
+- Vector tile map with a custom style: bluish-black background, roads in
+  yellow and cyan with a neon glow, buildings extruded in red.
+- POI icons by business type (130 categories mapped).
+- The camera follows you and **turns with your heading**. While moving, the
+  GPS is in charge; stopped, the phone's compass is, because `coords.heading`
+  comes back as `null` without movement.
+- HUD with speedometer, heading, accuracy, and position.
 
-**Buscar e ir**
+**Search and go**
 
-- Buscador a pantalla completa con autocompletado, sesgado a tu posición y con
-  la distancia a cada resultado.
-- Ruta en coche dibujada en magenta con el mismo apilado de neón que las calles.
-- **Vista previa** que encuadra el viaje entero para decidir, y botón **IR** que
-  baja la cámara a nivel de calle, inclinada y con tu marcador en el tercio
-  inferior. Son dos cámaras distintas a propósito: una sola no puede servir para
-  las dos cosas.
-- Tarjeta del **siguiente giro** con flecha, calle y metros que faltan, más la
-  distancia y el tiempo restantes. **PARAR** para terminar.
-- **Recálculo automático** al salirse de la ruta.
-- La pantalla no se apaga mientras la app esté en primer plano.
+- Fullscreen search with autocomplete, biased toward your position, showing
+  the distance to each result.
+- Driving route drawn in magenta with the same neon layering as the streets.
+- A **preview** that frames the whole trip so you can decide, and a **GO**
+  button that drops the camera to street level, tilted, with your marker in
+  the lower third. These are two distinct cameras on purpose: one alone
+  can't serve both purposes.
+- A **next turn** card with an arrow, street name, and distance remaining,
+  plus the overall remaining distance and time. **STOP** to end.
+- **Automatic reroute** on leaving the route.
+- The screen doesn't turn off while the app is in the foreground.
 
-**Panel `DIAG`**
+**`DIAG` panel**
 
-Mide en el dispositivo real lo que no se puede suponer: precisión e intervalo
-del GPS, modo standalone, bloqueo de pantalla, voces de síntesis disponibles y
-brújula. Existe porque varias decisiones del proyecto dependían de datos que
-solo el iPhone podía dar.
+Measures on the real device what can't be assumed: GPS accuracy and
+interval, standalone mode, screen lock, available synthesis voices, and
+compass. It exists because several of the project's decisions depended on
+data only the iPhone could provide.
 
-## Arrancar
+## Getting started
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre <http://localhost:5173>. Añade `?lab` para los controles de afinado del
-estilo (saltos entre ciudades, barrido de zoom, lectura de zoom/pitch/bearing).
+Open <http://localhost:5173>. Add `?lab` for style-tuning desktop controls
+(jumps between cities, a zoom sweep, a zoom/pitch/bearing readout).
 
-El repo es un **workspace de npm**: se instala y se ejecuta desde la raíz, no
-desde `app/`. Si el 5173 está ocupado, `PORT=5174 npm run dev`.
+The repo is an **npm workspace**: it's installed and run from the root, not
+from `app/`. If 5173 is taken, `PORT=5174 npm run dev`.
 
-En `localhost` la API de Stadia funciona **sin clave** (con límite de peticiones
-más estricto), así que no hace falta configurar nada para desarrollar.
+On `localhost` the Stadia API works **without a key** (with a stricter rate
+limit), so there's nothing to configure for development.
 
-## Probar
+## Testing
 
 ```bash
 npm test
 ```
 
-39 tests, todos sobre lógica pura. Cubren lo que no se puede comprobar sin
-conducir: proyección sobre la ruta, siguiente maniobra, distancia y tiempo
-restantes, detección de desvío y la máquina de estados del recálculo.
+47 tests, all over pure logic. They cover what can't be checked without
+driving: projection onto the route, next maneuver, remaining distance and
+time, deviation detection, and the reroute state machine.
 
-Las trazas GPS se **generan recorriendo una polilínea real** capturada de la API
-(`app/src/services/routing.fixture.ts`). Tres casos que importan:
+GPS traces are **generated by walking a real polyline** captured from the
+API (`app/src/services/routing.fixture.ts`). Three cases that matter:
 
-| Caso | Qué comprueba |
+| Case | What it checks |
 |---|---|
-| Recorrido limpio | Las maniobras avanzan en orden y nunca se declara desvío |
-| Desvío deliberado | El desvío salta a la tercera lectura, y **no antes** |
-| Ruido de ±60 m | **No** debe declarar desvío: es el falso positivo que arruina estas apps |
+| Clean run | Maneuvers advance in order and a deviation is never declared |
+| Deliberate deviation | The deviation fires on the third reading, and **not before** |
+| ±60 m noise | Must **not** declare a deviation: it's the false positive that ruins these apps |
 
-## Estructura
+## Structure
 
 ```
-style/build.mjs         generador del estilo  <- aquí se afina el look
-style/cyberpunk.json    artefacto generado (35 capas), portable a cualquier MapLibre
-assets/lib/poi-icons.mjs glifos de POI y qué negocio lleva cada uno
-assets/lib/raster.mjs   rasterizador RGBA y codificador PNG, sin dependencias
-assets/make-sprite.mjs  dibuja el sprite de POI (1x y 2x)
-assets/make-icons.mjs   dibuja los iconos de la PWA
+style/build.mjs         style generator  <- this is where the look is tuned
+style/cyberpunk.json    generated artifact (35 layers), portable to any MapLibre
+assets/lib/poi-icons.mjs POI glyphs and which business gets each one
+assets/lib/raster.mjs   RGBA rasterizer and PNG encoder, no dependencies
+assets/make-sprite.mjs  draws the POI sprite (1x and 2x)
+assets/make-icons.mjs   draws the PWA icons
 
 app/src/
-  main.ts               cableado y máquina de estados de la interfaz
-  map/map.ts            mapa, cámaras (seguimiento / previa / navegación), marcador
-  hud/                  velocímetro y lecturas
-  search/               buscador a pantalla completa
-  route/                capa de la ruta en el mapa y tarjeta de resumen
-  nav/                  navegación: lógica PURA + orquestador
-    snap.ts             proyecta tu posición sobre la ruta
-    progress.ts         siguiente maniobra, distancia y tiempo restantes
-    off-route.ts        detección de desvío
-    session.ts          máquina de estados (el único impuro de la carpeta)
-    maneuver-card.ts    tarjeta del siguiente giro
+  main.ts               wiring and UI state machine
+  map/map.ts            map, cameras (following / preview / navigation), marker
+  hud/                  speedometer and readouts
+  search/               fullscreen search
+  route/                route layer on the map and summary card
+  nav/                  navigation: PURE logic + orchestrator
+    snap.ts             projects your position onto the route
+    progress.ts         next maneuver, remaining distance and time
+    off-route.ts        deviation detection
+    session.ts          state machine (the only impure thing in the folder)
+    maneuver-card.ts    next-turn card
   services/
-    geolocation.ts      único dueño del watchPosition
-    compass.ts          brújula del dispositivo
-    heading.ts          quién manda el rumbo: GPS en marcha, brújula parado
-    keep-awake.ts       que la pantalla no se apague
-    stadia.ts           cliente HTTP común
-    geocoding.ts        autocompletado de destinos
-    routing.ts          rutas de Valhalla y decodificador de polilínea
-    geo-math.ts         haversine y formato de distancias y tiempos
-  diag/probe.ts         panel de diagnóstico
+    geolocation.ts      sole owner of watchPosition
+    compass.ts          device compass
+    heading.ts          who's in charge of heading: GPS while moving, compass while stopped
+    keep-awake.ts       keeps the screen from turning off
+    stadia.ts           shared HTTP client
+    geocoding.ts        destination autocomplete
+    routing.ts          Valhalla routes and polyline decoder
+    geo-math.ts         haversine and distance/time formatting
+  diag/probe.ts         diagnostics panel
 
-docs/hallazgos.md       trampas encontradas y por qué el código es como es
-docs/estado.md          estado del proyecto y qué queda
+docs/findings.md        pitfalls found and why the code is the way it is
+docs/status.md          project status and what's left
 ```
 
-La carpeta `nav/` está separada en lógica pura y orquestador a propósito: es lo
-único que permite probar el comportamiento sin salir a la carretera.
+The `nav/` folder is deliberately split into pure logic and an orchestrator:
+it's the only thing that makes it possible to test the behavior without
+going out on the road.
 
-## Afinar la estética
+## Tuning the aesthetic
 
-`style/cyberpunk.json` **no se edita a mano**: lo genera `style/build.mjs` a
-partir de una paleta y una tabla de clases de carretera. Edita `build.mjs`,
-guarda, y el mapa se actualiza solo sin recargar la página ni perder la cámara
-(un plugin de Vite re-ejecuta el generador y el HMR reaplica el estilo).
+`style/cyberpunk.json` is **never hand-edited**: `style/build.mjs` generates
+it from a palette and a road-class table. Edit `build.mjs`, save, and the
+map updates itself without reloading the page or losing the camera (a Vite
+plugin re-runs the generator and HMR reapplies the style).
 
-El neón sale de apilar tres capas de línea por clase de carretera:
+The neon comes from stacking three line layers per road class:
 
-| estrato | ancho | `line-blur` | opacidad | papel |
+| layer | width | `line-blur` | opacity | role |
 |---|---|---|---|---|
-| `glow` | x3 a x5.5 | alto | 0.10 - 0.45 | el halo de color |
-| `mid`  | x1.7 | bajo | 0.40 | el cuerpo |
-| `core` | x1 | 0 | 1 | el filamento aclarado |
+| `glow` | x3 to x5.5 | high | 0.10 - 0.45 | the color halo |
+| `mid`  | x1.7 | low | 0.40 | the body |
+| `core` | x1 | 0 | 1 | the lightened filament |
 
-Las dos perillas que más importan:
+The two knobs that matter most:
 
-- **`coreLighten`** por clase. Pasar de ~0.4 mata el color y todo se vuelve
-  blanco: el mapa deja de parecer neón y parece un mapa normal con calles claras.
-- **Que las calles menores retrocedan.** Son el 80% de las líneas; si compiten,
-  el neón de las vías importantes no se ve.
+- **`coreLighten`** per class. Go above ~0.4 and it kills the color and
+  everything turns white: the map stops looking like neon and starts
+  looking like a normal map with light-colored streets.
+- **Minor streets need to stay in the background.** They're 80% of the
+  lines; if they compete, the neon on the important roads doesn't read.
 
-Los edificios salen en rojo por una interacción del shader que se descubrió
-investigando un bug y se decidió conservar. Está explicado en
-[docs/hallazgos.md](docs/hallazgos.md) §1, junto con cómo devolverlos al azul.
+Buildings come out red because of a shader interaction discovered while
+investigating a bug and kept on purpose. It's explained in
+[docs/findings.md](docs/findings.md) §1, along with how to turn them back
+blue.
 
-## Iconos de POI
+## POI icons
 
-Cada establecimiento lleva el icono de su categoría: cruz de medpoint en
-farmacias y centros de salud, copa en bares, vaso de fideos en restaurantes,
-caja en tiendas, flecha en paradas y estaciones, torres en colegios y oficinas.
+Every business carries its category's icon: a medpoint cross for pharmacies
+and health centers, a glass for bars, a noodle cup for restaurants, a box
+for shops, an arrow for stops and stations, towers for schools and offices.
 
-Todo sale de `assets/lib/poi-icons.mjs`, que es la **fuente única de verdad**:
+Everything comes from `assets/lib/poi-icons.mjs`, the **single source of
+truth**:
 
-- `ICONS` = los 15 glifos, dibujados como código (sin SVG ni dependencias).
-- `MEMBERS` = qué tipos de establecimiento lleva cada icono, con etiquetas
-  `class` del esquema OpenMapTiles (130 tipos mapeados).
+- `ICONS` = the 15 glyphs, drawn as code (no SVG, no dependencies).
+- `MEMBERS` = which business types get each icon, tagged with OpenMapTiles
+  `class` labels (130 types mapped).
 
-De ese archivo tiran los dos generadores, así que no pueden desincronizarse:
-`assets/make-sprite.mjs` dibuja el sprite, y `style/build.mjs` construye la
-expresión `icon-image` del estilo.
+Both generators pull from that file, so they can't get out of sync:
+`assets/make-sprite.mjs` draws the sprite, and `style/build.mjs` builds the
+style's `icon-image` expression.
 
 ```bash
 npm run sprite
 ```
 
-**Para cambiar qué icono lleva un tipo de negocio**, mueve su etiqueta de una
-lista a otra en `MEMBERS`. Una etiqueta en dos listas lanza un error al generar,
-porque una expresión `match` de MapLibre rechaza etiquetas repetidas y eso
-rompería el estilo entero al cargar.
+**To change which icon a business type gets**, move its tag from one list
+to another in `MEMBERS`. A tag in two lists throws an error at generation
+time, because a MapLibre `match` expression rejects repeated tags, and that
+would break the whole style on load.
 
-**Para añadir un icono nuevo**, mete su glifo en `ICONS` y su lista en
-`MEMBERS`. Se dibuja en una caja de 24x24 con `segment`, `polyline`, `polygon` y
-`circle`; el generador ya pinta la placa y el borde antes de llamar al glifo.
+**To add a new icon**, drop its glyph into `ICONS` and its list into
+`MEMBERS`. It's drawn in a 24x24 box with `segment`, `polyline`, `polygon`,
+and `circle`; the generator already paints the plate and border before
+calling the glyph.
 
-Las flechas de maniobra son aparte (`nav/maneuver-card.ts`) y son SVG en línea,
-porque van en el HUD y no en el mapa: no necesitan sprite ni glifos SDF.
+Maneuver arrows are separate (`nav/maneuver-card.ts`) and are inline SVG,
+because they live in the HUD, not on the map: they need neither a sprite
+nor SDF glyphs.
 
-Todos los glifos son originales, en el lenguaje visual del juego. **No** son los
-assets de Cyberpunk 2077, que son propiedad de CD Projekt Red.
+All glyphs are original, in the game's visual language. They are **not**
+Cyberpunk 2077's own assets, which are the property of CD Projekt Red.
 
-## Servicios
+## Services
 
-| Qué | Quién | Clave |
+| What | Who | Key |
 |---|---|---|
-| Teselas vectoriales | [OpenFreeMap](https://openfreemap.org) (esquema OpenMapTiles) | No necesita |
-| Autocompletado de destinos | Stadia Maps (Pelias) | Por dominio |
-| Rutas en coche | Stadia Maps (Valhalla) | Por dominio |
+| Vector tiles | [OpenFreeMap](https://openfreemap.org) (OpenMapTiles schema) | Not needed |
+| Destination autocomplete | Stadia Maps (Pelias) | By domain |
+| Driving routes | Stadia Maps (Valhalla) | By domain |
 
-**No hay ninguna clave de API en el código.** Stadia autentica por dominio:
-valida las cabeceras `Origin` y `Referer` que el navegador manda solo. Basta con
-dar de alta el dominio en el panel de Stadia, en *Authentication Configuration*:
+**There is no API key in the code.** Stadia authenticates by domain: it
+validates the `Origin` and `Referer` headers that the browser sends on its
+own. Just register the domain in Stadia's panel, under *Authentication
+Configuration*:
 
-- Son **dos campos separados por un punto**, no una URL: `games-map` en
-  *Subdomain* y `ggigelmo.workers.dev` en *Domain*. Sin `https://`.
-- **El alta tarda un par de minutos en propagar.** Justo después de guardarla la
-  API sigue devolviendo `401 No valid authentication provided`. No merece la pena
-  depurar en esa ventana.
+- It's **two fields separated by a dot**, not a URL: `games-map` in
+  *Subdomain* and `ggigelmo.workers.dev` in *Domain*. No `https://`.
+- **Registering it takes a couple of minutes to propagate.** Right after
+  saving it, the API still returns `401 No valid authentication provided`.
+  Debugging in that window isn't worth it.
 
-Consecuencia a tener en cuenta: si alguna vez se pone `Referrer-Policy:
-no-referrer` en el sitio, la autenticación deja de funcionar.
+Worth keeping in mind: if `Referrer-Policy: no-referrer` is ever set on the
+site, authentication stops working.
 
-Valhalla devuelve las instrucciones **ya redactadas en español**, incluidas tres
-variantes pensadas para leerse en voz alta. Es lo que hará fácil añadir la voz.
+Valhalla returns instructions **already drafted in whatever language is
+requested**, including three variants meant to be read aloud. That's what
+made adding voice easy.
 
-## Desplegar (Cloudflare Workers)
+## Deploying (Cloudflare Workers)
 
-Ya está configurado. En **Workers & Pages → Create → Import a repository**, con
-`ggigelmo/games-map`:
+Already configured. In **Workers & Pages → Create → Import a repository**,
+with `ggigelmo/games-map`:
 
-| Campo | Valor |
+| Field | Value |
 |---|---|
 | Build command | `npm run build` |
 | Deploy command | `npx wrangler deploy` |
 | Root directory | `/` |
 
-El build corre desde la raíz del repo, no desde `app/`. Eso funciona porque el
-`package.json` de la raíz declara `app` como **workspace** de npm: `npm install`
-instala las dependencias del workspace y `npm run build` delega en él. También
-evita que el build dependa de subir un nivel para encontrar `style/`.
+The build runs from the repo root, not from `app/`. That works because the
+root `package.json` declares `app` as an npm **workspace**: `npm install`
+installs the workspace's dependencies and `npm run build` delegates to it.
+It also keeps the build from having to go up a level to find `style/`.
 
-`wrangler.jsonc` define un Worker **sin código**, solo assets, así que no lleva
-`main`. Validar la configuración sin desplegar ni necesitar credenciales:
+`wrangler.jsonc` defines a Worker with **no code**, only assets, so it
+doesn't carry a `main`. To validate the configuration without deploying or
+needing credentials:
 
 ```bash
 npm run build && npx wrangler deploy --dry-run
 ```
 
-Para desplegar desde tu máquina en vez de por Git (requiere `npx wrangler login`
-una vez):
+To deploy from your own machine instead of via Git (requires
+`npx wrangler login` once):
 
 ```bash
 npm run deploy
 ```
 
-El fallback de una sola página lo da `not_found_handling` en `wrangler.jsonc`.
-`app/public/_headers` existe porque hace algo que `wrangler.jsonc` no: fijar el
-`Content-Type` del manifest.
+The single-page fallback is provided by `not_found_handling` in
+`wrangler.jsonc`. `app/public/_headers` exists because it does something
+`wrangler.jsonc` doesn't: pin the manifest's `Content-Type`.
 
-> Al generar el lockfile, hazlo **en limpio**: un `npm install` parcial en
-> Windows registra solo los binarios nativos de esa plataforma y el build de
-> Linux falla con `Cannot find module @rollup/rollup-linux-x64-gnu`. Detalle y
-> comprobación de una línea en [docs/hallazgos.md](docs/hallazgos.md) §8.
+> When generating the lockfile, do it **clean**: a partial `npm install` on
+> Windows only records that platform's native binaries, and the Linux build
+> fails with `Cannot find module @rollup/rollup-linux-x64-gnu`. Details and
+> a one-line check in [docs/findings.md](docs/findings.md) §8.
 
-## Instalar en el iPhone
+## Installing on an iPhone
 
-Abrir la URL **en Safari** (no en Chrome), Compartir → Añadir a pantalla de
-inicio. Arranca a pantalla completa, sin barra del navegador.
+Open the URL **in Safari** (not Chrome), Share → Add to Home Screen. It
+launches fullscreen, with no browser bar.
 
-> Antes de nada, en el iPhone: Ajustes → Privacidad y seguridad → Localización
-> → Safari → **Ubicación precisa activada**. Sin eso el GPS devuelve una posición
-> con 3-9 km de error y solo la refresca cada 15 minutos, **sin dar ningún
-> error**. El panel `DIAG` lo detecta y lo dice.
+> First, on the iPhone: Settings → Privacy & Security → Location Services →
+> Safari → **Precise Location on**. Without it, the GPS returns a position
+> with 3-9 km of error and only refreshes it every 15 minutes, **with no
+> error raised at all**. The `DIAG` panel detects it and says so.
 
-Lo que conviene leer en `DIAG` la primera vez:
+Worth reading in `DIAG` the first time:
 
-| Lectura | Bien | Mal |
+| Reading | Good | Bad |
 |---|---|---|
-| Precisión | ≤ 30 m | Kilómetros → Ubicación precisa desactivada |
-| Intervalo entre fixes | ≤ 5 s | Minutos → misma causa |
-| Pantalla encendida | `API NATIVA` o `VIDEO` | `NO ACTIVA` |
-| Brújula | Pulsa **ACTIVAR BRÚJULA**; luego muestra el rumbo en vivo | `PERMISO DENEGADO` |
-| Voces (es / total) | ≥ 1 en español | 0 → la app no podrá hablar |
+| Accuracy | ≤ 30 m | Kilometers → Precise Location disabled |
+| Interval between fixes | ≤ 5 s | Minutes → same cause |
+| Screen wake lock | `NATIVE API` or `VIDEO` | `NOT ACTIVE` |
+| Compass | Tap **ENABLE COMPASS**; it then shows the live heading | `PERMISSION DENIED` |
+| Voices (en / total) | ≥ 1 in English | 0 → the app won't be able to speak |
 
 ## Scripts
 
-| Comando | Qué hace |
+| Command | What it does |
 |---|---|
-| `npm run dev` | Servidor de desarrollo con recarga en caliente del estilo |
-| `npm test` | Tests de la lógica pura |
-| `npm run build` | Typecheck y build de producción |
-| `npm run style` | Regenera `style/cyberpunk.json` |
-| `npm run sprite` | Regenera el sprite de POI y el estilo |
-| `npm run icons` | Regenera los iconos de la PWA |
-| `npm run deploy` | Build y despliegue con wrangler |
+| `npm run dev` | Dev server with hot-reloading of the style |
+| `npm test` | Pure-logic tests |
+| `npm run build` | Typecheck and production build |
+| `npm run style` | Regenerates `style/cyberpunk.json` |
+| `npm run sprite` | Regenerates the POI sprite and the style |
+| `npm run icons` | Regenerates the PWA icons |
+| `npm run deploy` | Build and deploy with wrangler |
 
-## Documentación
+## Documentation
 
-- **[docs/hallazgos.md](docs/hallazgos.md)** — las once trampas que costaron
-  tiempo, con la causa y por qué el código es como es. Se lee antes de "limpiar"
-  cualquier cosa que parezca rara.
-- **[docs/estado.md](docs/estado.md)** — qué está hecho, qué queda y qué
-  decisiones se tomaron por el camino.
+- **[docs/findings.md](docs/findings.md)** — the eleven pitfalls that cost
+  time, with the cause and why the code is the way it is. Read before
+  "cleaning up" anything that looks odd.
+- **[docs/status.md](docs/status.md)** — what's done, what's left, and the
+  decisions made along the way.
