@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "GPS navigator with Cyberpunk 2077 aesthetics",
+  "license": "MIT",
   "workspaces": [
     "app"
   ],

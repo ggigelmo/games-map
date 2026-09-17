@@ -27,7 +27,7 @@ export const DIM = hex('#4d8fa0');
  * here.
  */
 export const ICONS = {
-  // --- food: cup of noodles with chopsticks, Night City's street food
+  // --- food: cup of noodles with chopsticks, a cyberpunk street-food staple
   food: {
     tint: YELLOW,
     draw: (c, k) => {

@@ -4,8 +4,8 @@
  *   node assets/make-sprite.mjs
  *
  * Output in app/public/sprites/:
- *   night-city.png      night-city.json       (pixelRatio 1)
- *   night-city@2x.png   night-city@2x.json    (pixelRatio 2)
+ *   poi-sprite.png      poi-sprite.json       (pixelRatio 1)
+ *   poi-sprite@2x.png   poi-sprite@2x.json    (pixelRatio 2)
  *
  * MapLibre requests `{sprite}.json` + `{sprite}.png`, and adds the `@2x`
  * suffix when devicePixelRatio > 1 (i.e. always, on an iPhone). Without the
@@ -87,7 +87,7 @@ for (const [ratio, suffix] of [
   [2, '@2x'],
 ]) {
   const { png, index, w, h, count } = buildSheet(ratio);
-  writeFileSync(join(OUT_DIR, `night-city${suffix}.png`), png);
-  writeFileSync(join(OUT_DIR, `night-city${suffix}.json`), JSON.stringify(index, null, 2) + '\n');
-  console.log(`ok  night-city${suffix}  ${w}x${h}px  ${count} icons  ${png.length} bytes`);
+  writeFileSync(join(OUT_DIR, `poi-sprite${suffix}.png`), png);
+  writeFileSync(join(OUT_DIR, `poi-sprite${suffix}.json`), JSON.stringify(index, null, 2) + '\n');
+  console.log(`ok  poi-sprite${suffix}  ${w}x${h}px  ${count} icons  ${png.length} bytes`);
 }

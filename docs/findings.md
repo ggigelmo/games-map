@@ -32,9 +32,9 @@ color: it gives the complementary color instead.
 ## 2. MapLibre requires the sprite URL to be ABSOLUTE
 
 Unlike tile and glyph URLs, which it accepts as relative, a
-`sprite: '/sprites/night-city'` is rejected with:
+`sprite: '/sprites/poi-sprite'` is rejected with:
 
-> Invalid sprite URL "/sprites/night-city", must be absolute.
+> Invalid sprite URL "/sprites/poi-sprite", must be absolute.
 
 Putting the domain in the JSON would tie it to the environment and it
 would stop working on localhost and Netlify at the same time. That's why

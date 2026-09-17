@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "name": "Night City",
+  "name": "Cyberpunk Maps",
   "metadata": {
     "games-map:generated-by": "style/build.mjs",
     "games-map:note": "Do not edit by hand. Edit build.mjs and rerun it."
@@ -12,7 +12,7 @@
     }
   },
   "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
-  "sprite": "/sprites/night-city",
+  "sprite": "/sprites/poi-sprite",
   "light": {
     "anchor": "viewport",
     "color": "#00f0ff",
