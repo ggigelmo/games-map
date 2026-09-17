@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-GPS navigator with a Cyberpunk 2077 aesthetic, as a PWA. Vite + vanilla
+GPS navigator with a Cyberpunk aesthetic, as a PWA. Vite + vanilla
 TypeScript + MapLibre GL JS. No UI framework.
 
 The **README** covers what the app does and its folder structure.
