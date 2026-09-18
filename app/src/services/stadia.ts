@@ -13,6 +13,10 @@
 const BASE = 'https://api.stadiamaps.com';
 const TIMEOUT_MS = 8_000;
 
+/** Shown both for a real 429 from Stadia and for the local self-imposed cap
+ * in `search-limit.ts`, so the experience is identical either way. */
+export const QUOTA_MESSAGE = 'Demo search limit reached for now, try again later';
+
 /** Error with a message the UI can show as-is. */
 export class StadiaError extends Error {
   constructor(
@@ -56,7 +60,7 @@ export async function stadiaGet<T>(
         res.status === 401 || res.status === 403
           ? 'Domain not authorized with Stadia Maps'
           : res.status === 429
-            ? 'Demo search limit reached for now, try again later'
+            ? QUOTA_MESSAGE
             : `Error ${res.status}`;
       throw new StadiaError(hint, res.status);
     }

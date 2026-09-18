@@ -17,6 +17,7 @@
 import type { Compass } from '../services/compass';
 import type { KeepAwake, KeepAwakeMethod } from '../services/keep-awake';
 import type { GeoWatcher } from '../services/geolocation';
+import { searchUsage } from '../services/search-limit';
 
 type Verdict = 'ok' | 'warn' | 'bad' | 'pending';
 
@@ -110,6 +111,17 @@ export function mountDiagnostics(
     'Secure context',
     window.isSecureContext ? 'HTTPS' : 'INSECURE',
     window.isSecureContext ? 'ok' : 'bad',
+  );
+
+  // A mount-time snapshot, not live: it won't reflect searches made later
+  // in the same session. That's enough to answer "is this browser anywhere
+  // near its own self-imposed cap", which is all this row is for.
+  const usage = searchUsage();
+  set(
+    'searchCap',
+    'Search quota',
+    `${usage.count}/${usage.limit} this month`,
+    usage.count >= usage.limit ? 'bad' : 'ok',
   );
 
   // ---------------------------------------------------- geolocation

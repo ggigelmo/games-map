@@ -1,6 +1,7 @@
 import { formatDistance, type Point } from '../services/geo-math';
 import { autocomplete, MIN_QUERY_LENGTH, type Place } from '../services/geocoding';
-import { StadiaError } from '../services/stadia';
+import { searchUsage, trySearch } from '../services/search-limit';
+import { QUOTA_MESSAGE, StadiaError } from '../services/stadia';
 
 /** How long to wait after the last keystroke before asking the server. */
 const DEBOUNCE_MS = 300;
@@ -78,11 +79,30 @@ export class SearchOverlay {
       return;
     }
 
+    // A non-incrementing peek: just avoids flashing "Searching..." for a
+    // request that's already known to be over budget. The real, counted
+    // check is in run(), right before the network call.
+    const usage = searchUsage();
+    if (usage.count >= usage.limit) {
+      this.list.replaceChildren();
+      this.status.textContent = QUOTA_MESSAGE.toUpperCase();
+      return;
+    }
+
     this.status.textContent = 'Searching…';
     this.timer = window.setTimeout(() => void this.run(text), DEBOUNCE_MS);
   }
 
   private async run(text: string) {
+    // The counted check: schedule()'s peek only avoided a UI flash, this is
+    // what actually spends a unit of this browser's self-imposed cap, one
+    // per real request.
+    if (!trySearch()) {
+      this.list.replaceChildren();
+      this.status.textContent = QUOTA_MESSAGE.toUpperCase();
+      return;
+    }
+
     // Cancelling the previous request isn't an optimization: without it,
     // responses arrive out of order and the list flickers with results from
     // already-stale queries.
