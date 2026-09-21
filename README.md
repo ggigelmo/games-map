@@ -7,6 +7,8 @@ where it launches fullscreen with no Safari bar.
 
 In production: <https://games-map.ggigelmo.workers.dev>
 
+![Map screenshot: neon cyberpunk style over Madrid, red buildings, cyan and yellow glowing roads](readme-preview.png)
+
 ## What it does
 
 **Map and position**
