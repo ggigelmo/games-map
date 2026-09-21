@@ -3,8 +3,7 @@
 GPS navigator with a Cyberpunk aesthetic.
 
 It's a **PWA**: deployed as a website and added to the iPhone home screen,
-where it launches fullscreen with no Safari bar. No App Store, no Apple
-Developer Program, and no Mac.
+where it launches fullscreen with no Safari bar.
 
 In production: <https://games-map.ggigelmo.workers.dev>
 
